@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalOPs Dashboard</title>
+  <meta name="description" content="SignalOPs dashboard for silent revenue leak analysis." />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/logo.png" />
+  <link rel="apple-touch-icon" href="/assets/logo.png" />
+  <meta property="og:image" content="/assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <img src="/assets/logo.png" alt="SignalOPs logo" class="brand-logo" />
+          <span>SignalOPs</span>
+        </div>
+        <p class="brand-sub">Silent Revenue Leaks</p>
+      </div>
+
+      <div class="sidebar-block">
+        <h3>Target Segment</h3>
+        <p>Shopify stores doing $5k-$25k monthly revenue.</p>
+      </div>
+
+      <div class="sidebar-block history-block">
+        <h3>Recent Analyses</h3>
+        <ul id="history-list" class="history-list">
+          <li class="history-empty">No saved analyses yet.</li>
+        </ul>
+      </div>
+
+      <div class="sidebar-user">
+        <button id="user-toggle" class="user-toggle" type="button" aria-expanded="false">
+          <span class="user-avatar" aria-hidden="true"></span>
+          <span id="user-name">User</span>
+        </button>
+        <div id="user-actions" class="user-actions" hidden>
+          <button id="logout-btn" type="button">Log out</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-top">
+        <div>
+          <h1>Analysis Workspace</h1>
+          <p>Drop a CSV and SignalOPs will generate diagnosis in this panel.</p>
+        </div>
+      </header>
+
+      <section id="analysis-feed" class="analysis-feed" aria-live="polite">
+        <article class="feed-empty" id="feed-empty">
+          <h2>No analysis yet</h2>
+          <p>Upload a Shopify orders CSV to begin leak detection.</p>
+        </article>
+      </section>
+
+      <section class="composer">
+        <form id="upload-form" class="upload-form" novalidate>
+          <div id="drop-zone" class="drop-zone">
+            <input id="csv-file" type="file" accept=".csv" name="file" />
+            <p><strong>Drop CSV here</strong> or click to select.</p>
+            <small>Expected columns include order_id, customer_id, order_date, order_total.</small>
+          </div>
+          <button class="run-btn" type="submit">Run Analysis</button>
+        </form>
+        <p id="status" class="status"></p>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    window.SIGNALOPS_API_BASE = window.SIGNALOPS_API_BASE || "http://127.0.0.1:8000";
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

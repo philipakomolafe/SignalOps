@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalOPs | Log In</title>
+  <meta name="description" content="Log in to your SignalOPs account." />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/logo.png" />
+  <link rel="apple-touch-icon" href="/assets/logo.png" />
+  <meta property="og:image" content="/assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <header class="auth-head">
+        <a class="brand" href="/v1/">
+          <img src="/assets/logo.png" alt="SignalOPs logo" class="brand-logo" />
+          <span>signalops</span>
+        </a>
+        <h1>Welcome!</h1>
+        <nav class="tabs" aria-label="Authentication">
+          <button class="tab active" type="button" data-tab-target="signin">Sign In</button>
+          <button class="tab" type="button" data-tab-target="register">Register</button>
+        </nav>
+      </header>
+
+      <section class="auth-body">
+        <form id="signin-form" class="form tab-panel active" data-tab-panel="signin" novalidate>
+          <label for="signin-email">Email</label>
+          <input id="signin-email" name="email" type="email" autocomplete="email" required />
+
+          <label for="signin-password">Password</label>
+          <input id="signin-password" name="password" type="password" minlength="8" autocomplete="current-password" required />
+
+          <button id="signin-btn" type="submit">Sign in with Email</button>
+        </form>
+
+        <form id="register-form" class="form tab-panel" data-tab-panel="register" novalidate hidden>
+          <label for="register-name">Full name</label>
+          <input id="register-name" name="full_name" type="text" autocomplete="name" required />
+
+          <label for="register-email">Work email</label>
+          <input id="register-email" name="email" type="email" autocomplete="email" required />
+
+          <label for="register-company">Company (optional)</label>
+          <input id="register-company" name="company" type="text" autocomplete="organization" />
+
+          <label for="register-password">Password</label>
+          <input id="register-password" name="password" type="password" minlength="8" autocomplete="new-password" required />
+
+          <button id="register-btn" type="submit">Create account with Email</button>
+        </form>
+
+        <p id="status" class="status" aria-live="polite"></p>
+
+        <div id="success" class="success" hidden>
+          <h2>Account created</h2>
+          <p>Your account is ready. Use Sign In to continue to dashboard.</p>
+        </div>
+      </section>
+    </section>
+
+    <footer class="auth-footer">
+      <a href="/v1/">Contact Us</a>
+      <span>/</span>
+      <a href="/v1/">Support</a>
+    </footer>
+  </main>
+
+  <script>
+    window.SIGNALOPS_API_BASE = window.SIGNALOPS_API_BASE || "http://127.0.0.1:8000";
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

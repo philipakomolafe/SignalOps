@@ -1,0 +1,7 @@
+pydantic-settings
+pydantic
+pytest
+fastapi
+uvicorn
+python-multipart
+email-validator

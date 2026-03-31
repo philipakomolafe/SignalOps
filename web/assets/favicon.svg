@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="SignalOPs logo">
+  <path d="M32 36 A32 32 0 0 1 96 36" fill="none" stroke="#000" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="36" cy="76" r="24" fill="none" stroke="#000" stroke-width="14"/>
+  <circle cx="92" cy="76" r="24" fill="none" stroke="#000" stroke-width="14"/>
+  <line x1="6" y1="76" x2="122" y2="76" stroke="#000" stroke-width="6"/>
+  <circle cx="36" cy="76" r="4" fill="#1f2937"/>
+  <circle cx="92" cy="76" r="4" fill="#1f2937"/>
+</svg>
