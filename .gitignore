@@ -28,6 +28,7 @@ logs/
 # OS
 Thumbs.db
 
+
 # Project specific
 /web/v2
 /data/signalops.db
