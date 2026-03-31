@@ -31,6 +31,8 @@ Thumbs.db
 
 # Project specific
 /web/v2
+/app/data/
+/data/
 /data/signalops.db
 /README.txt
 /*.JPG
