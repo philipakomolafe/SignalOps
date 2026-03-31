@@ -108,6 +108,12 @@ It also supports chat-style entry URLs:
 - Analysis rows are user-scoped
 - Content-hash dedup prevents duplicate re-analysis for identical uploads
 
+## Pricing (Launch)
+
+- Free: One-time CSV analysis (1 upload + 1 report, no monitoring alerts)
+- Starter ($29/month): Continuous monitoring, weekly leak checks, saved history
+- Scale ($99/month): Integrations, real-time alerts, multi-store coverage, priority support
+
 ## Notes
 
 - Dashboard access requires authentication.
