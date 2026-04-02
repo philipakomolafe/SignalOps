@@ -22,7 +22,7 @@ It helps operators upload order data, generate key business features, detect sil
 
 - Backend: FastAPI
 - Frontend: Modular HTML/CSS/JS
-- Storage: SQLite
+- Storage: SQLite (default) or PostgreSQL (via DATABASE_URL)
 - Validation/Models: Pydantic
 
 ## Project Structure
@@ -54,20 +54,30 @@ signalops/
 pip install -r requirements.txt
 ```
 
-2. Start the API (also serves frontend routes)
+2. Optional: use PostgreSQL instead of SQLite
+
+```bash
+# Linux/macOS
+export DATABASE_URL="postgres://user:password@host:port/dbname?sslmode=require"
+
+# Windows PowerShell
+$env:DATABASE_URL="postgres://user:password@host:port/dbname?sslmode=require"
+```
+
+3. Start the API (also serves frontend routes)
 
 ```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-3. Open the app
+4. Open the app
 
 - Landing (v1): http://127.0.0.1:8000/v1/
 - Landing (v2): http://127.0.0.1:8000/v2/
 - Login/Register: http://127.0.0.1:8000/login/
 - Dashboard: http://127.0.0.1:8000/dashboard/
 
-4. Test with sample CSV
+5. Test with sample CSV
 
 - `app/utils/sample_shopify_orders.csv`
 
@@ -104,7 +114,8 @@ It also supports chat-style entry URLs:
 
 ## Persistence
 
-- SQLite DB file: `app/data/signalops.db`
+- Default (no DATABASE_URL): SQLite DB file at `app/data/signalops.db`
+- Production option: set `DATABASE_URL` to PostgreSQL (Aiven/Render compatible)
 - Analysis rows are user-scoped
 - Content-hash dedup prevents duplicate re-analysis for identical uploads
 

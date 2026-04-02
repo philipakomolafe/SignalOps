@@ -1,9 +1,8 @@
-# Standard library imports for hashing, tokens, filesystem paths, and SQLite errors.
+# Standard library imports for hashing, tokens, and filesystem paths.
 import hashlib
 import hmac
 import os
 import secrets
-import sqlite3
 from pathlib import Path
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
@@ -35,6 +34,7 @@ from app.services.ingestion import CSVNormalizationError, normalize_orders_csv
 from app.services.leak_engine import detect_leaks
 # Persistence layer for users, sessions, analysis history, and caching.
 from app.services.persistence import (
+    DuplicateEmailError,
     create_signup,
     create_session,
     find_analysis_by_hash,
@@ -221,7 +221,7 @@ def signup(payload: SignupRequest) -> SignupResponse:
             company=payload.company,
             password_hash=_hash_password(payload.password),
         )
-    except sqlite3.IntegrityError as exc:
+    except DuplicateEmailError as exc:
         # Unique email conflict returns explicit 409 response.
         raise HTTPException(status_code=409, detail="Email is already registered") from exc
 
