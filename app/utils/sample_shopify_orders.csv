@@ -15,3 +15,4 @@ order_id,customer_id,order_date,order_total,refunded_amount,currency
 1014,cust_k,2026-03-19,30.00,0,USD
 1015,cust_l,2026-03-21,28.00,0,USD
 1016,cust_l,2026-03-24,900.00,0,USD
+1017,cust_m,2026-04-02,50.00,2.00,USD
