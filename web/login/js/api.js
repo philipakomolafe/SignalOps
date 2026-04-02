@@ -1,4 +1,4 @@
-const API_BASE = window.SIGNALOPS_API_BASE || "http://127.0.0.1:8000";
+const API_BASE = (window.SIGNALOPS_API_BASE || window.location.origin || "").replace(/\/$/, "");
 const LOGIN_ENDPOINT = `${API_BASE}/api/v1/auth/login`;
 const SIGNUP_ENDPOINT = `${API_BASE}/api/v1/auth/signup`;
 
