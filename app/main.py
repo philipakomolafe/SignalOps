@@ -113,8 +113,6 @@ if WEB_ROOT.exists():
     app.mount("/signup", StaticFiles(directory=WEB_ROOT / "signup", html=True), name="signup")
     # Landing page variant 1.
     app.mount("/v1", StaticFiles(directory=WEB_ROOT / "v1", html=True), name="v1")
-    # Landing page variant 2.
-    app.mount("/v2", StaticFiles(directory=WEB_ROOT / "v2", html=True), name="v2")
 
 
 def _hash_password(password: str) -> str:
