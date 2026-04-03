@@ -26,6 +26,24 @@ except ImportError:  # pragma: no cover - exercised only when dependency is abse
 logger = logging.getLogger(__name__)
 
 
+def _mask_email(value: str | None) -> str:
+    """Return a partially masked email string for safe logging."""
+    email = (value or "").strip().lower()
+    if not email or "@" not in email:
+        return "***"
+
+    local, domain = email.split("@", 1)
+    masked_local = f"{local[:1]}***" if local else "***"
+    if "." in domain:
+        host, suffix = domain.rsplit(".", 1)
+        masked_host = f"{host[:1]}***" if host else "***"
+        masked_domain = f"{masked_host}.{suffix}"
+    else:
+        masked_domain = f"{domain[:1]}***" if domain else "***"
+
+    return f"{masked_local}@{masked_domain}"
+
+
 class DuplicateEmailError(ValueError):
     """Raised when creating a user with an email that already exists."""
 
@@ -404,7 +422,7 @@ def create_signup(
     """Create a new user account row and return user profile fields."""
     normalized_email = email.strip().lower()
     safe_company = (company or "").strip() or None
-    logger.info("Creating signup for email=%s", normalized_email)
+    logger.info("Creating signup for email=%s", _mask_email(normalized_email))
 
     try:
         with _connect() as connection:
@@ -437,9 +455,9 @@ def create_signup(
                 connection.commit()
     except Exception as exc:
         if _is_unique_violation(exc):
-            logger.warning("Duplicate signup attempt for email=%s", normalized_email)
+            logger.warning("Duplicate signup attempt for email=%s", _mask_email(normalized_email))
             raise DuplicateEmailError("Email is already registered") from exc
-        logger.exception("Signup creation failed for email=%s", normalized_email)
+        logger.exception("Signup creation failed for email=%s", _mask_email(normalized_email))
         raise
 
     if not row:
@@ -457,7 +475,7 @@ def create_signup(
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Fetch user row by normalized email, including password hash."""
     normalized_email = email.strip().lower()
-    logger.debug("Looking up user by email=%s", normalized_email)
+    logger.debug("Looking up user by email=%s", _mask_email(normalized_email))
     with _connect() as connection:
         row = _execute(
             connection,

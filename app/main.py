@@ -61,6 +61,24 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 
 
+def _mask_email(value: str | None) -> str:
+    """Return a partially masked email string for safe logging."""
+    email = (value or "").strip().lower()
+    if not email or "@" not in email:
+        return "***"
+
+    local, domain = email.split("@", 1)
+    masked_local = f"{local[:1]}***" if local else "***"
+    if "." in domain:
+        host, suffix = domain.rsplit(".", 1)
+        masked_host = f"{host[:1]}***" if host else "***"
+        masked_domain = f"{masked_host}.{suffix}"
+    else:
+        masked_domain = f"{domain[:1]}***" if domain else "***"
+
+    return f"{masked_local}@{masked_domain}"
+
+
 # FastAPI application object with metadata used by docs/clients.
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
@@ -251,11 +269,11 @@ def signup(payload: SignupRequest) -> SignupResponse:
             password_hash=_hash_password(payload.password),
         )
     except DuplicateEmailError as exc:
-        logger.warning("Signup rejected for duplicate email: %s", str(payload.email).strip().lower())
+        logger.warning("Signup rejected for duplicate email: %s", _mask_email(str(payload.email)))
         # Unique email conflict returns explicit 409 response.
         raise HTTPException(status_code=409, detail="Email is already registered") from exc
 
-    logger.info("Signup created for email: %s", created.get("email"))
+    logger.info("Signup created for email: %s", _mask_email(str(created.get("email") or "")))
     # Return typed signup response payload.
     return SignupResponse(**created)
 
@@ -267,7 +285,7 @@ def login(payload: LoginRequest) -> LoginResponse:
     user = get_user_by_email(str(payload.email))
     # Reject unknown users and invalid password combinations.
     if not user or not _verify_password(payload.password, user["password_hash"]):
-        logger.warning("Login failed for email: %s", str(payload.email).strip().lower())
+        logger.warning("Login failed for email: %s", _mask_email(str(payload.email)))
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Generate random session token for this login.
@@ -275,7 +293,7 @@ def login(payload: LoginRequest) -> LoginResponse:
     # Store only hashed token in DB session table.
     create_session(user_id=user["user_id"], token_hash=_hash_token(token))
 
-    logger.info("Login succeeded for user_id=%s email=%s", user["user_id"], user["email"])
+    logger.info("Login succeeded for user_id=%s email=%s", user["user_id"], _mask_email(str(user["email"])))
 
     # Return token + public user profile.
     return LoginResponse(
