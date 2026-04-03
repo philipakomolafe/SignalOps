@@ -1,4 +1,4 @@
-import { login, signup } from "./api.js";
+import { fetchCurrentUser, login, signup } from "./api.js";
 
 const TOKEN_STORAGE_KEY = "signalops_access_token";
 
@@ -10,6 +10,8 @@ const registerBtn = document.getElementById("register-btn");
 const successEl = document.getElementById("success");
 const tabs = Array.from(document.querySelectorAll(".tab"));
 const panels = Array.from(document.querySelectorAll(".tab-panel"));
+
+let isRedirectingToDashboard = false;
 
 function setStatus(message, isError = false) {
   if (!statusEl) return;
@@ -32,6 +34,28 @@ function setSubmitting(button, isSubmitting, busyLabel, idleLabel) {
   if (!button) return;
   button.disabled = isSubmitting;
   button.textContent = isSubmitting ? busyLabel : idleLabel;
+}
+
+function goToDashboard() {
+  if (isRedirectingToDashboard) return;
+  isRedirectingToDashboard = true;
+  // replace() prevents keeping login as a sticky destination in browser history.
+  window.location.replace("/dashboard/");
+}
+
+async function redirectIfSessionIsActive() {
+  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!token) {
+    return;
+  }
+
+  try {
+    await fetchCurrentUser(token);
+    goToDashboard();
+  } catch (_error) {
+    // Invalid/expired sessions should not lock users out of login.
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+  }
 }
 
 tabs.forEach((tab) => {
@@ -61,7 +85,7 @@ if (signinForm) {
       const result = await login(payload);
       localStorage.setItem(TOKEN_STORAGE_KEY, result.access_token);
       setStatus("Login successful. Redirecting...");
-      window.location.href = "/dashboard/";
+      goToDashboard();
     } catch (error) {
       setStatus(error.message || "Login failed.", true);
     } finally {
@@ -106,3 +130,5 @@ if (window.location.hash === "#register") {
 } else {
   activateTab("signin");
 }
+
+redirectIfSessionIsActive();
