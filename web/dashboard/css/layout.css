@@ -68,17 +68,56 @@
 
 @media (max-width: 980px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    width: min(1320px, 98%);
+    margin: 8px auto;
+    min-height: calc(100vh - 16px);
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 8px;
   }
 
   .sidebar {
-    order: 2;
-    height: auto;
-    grid-template-rows: auto;
+    order: 0;
+    position: sticky;
+    top: 8px;
+    height: calc(100vh - 16px);
+    padding: 10px 8px;
+    gap: 8px;
   }
 
   .workspace {
-    order: 1;
-    min-height: auto;
+    order: 0;
+    min-height: calc(100vh - 16px);
+  }
+
+  .workspace-top {
+    padding: 12px 12px 10px;
+  }
+
+  .analysis-feed {
+    padding: 10px 12px;
+  }
+
+  .composer {
+    padding: 10px 12px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: 100%;
+    margin: 0;
+    min-height: 100vh;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .sidebar,
+  .workspace {
+    border-radius: 12px;
+  }
+
+  .sidebar {
+    height: calc(100vh - 16px);
   }
 }

@@ -525,3 +525,47 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .container {
+    width: min(var(--max), 96%);
+  }
+
+  .nav {
+    min-height: 64px;
+    gap: 10px;
+  }
+
+  .brand {
+    font-size: 0.86rem;
+  }
+
+  .btn {
+    padding: 9px 14px;
+    font-size: 0.82rem;
+  }
+
+  .hero {
+    padding: 6.2rem 0 3.1rem;
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+
+  .hero .sub {
+    font-size: 0.88rem;
+  }
+
+  .section {
+    padding: 2.1rem 0;
+  }
+
+  .panel {
+    padding: 1rem 0.88rem;
+  }
+
+  .card {
+    padding: 1.05rem 0.92rem;
+  }
+}
