@@ -1,6 +1,8 @@
 # CSV parsing + normalization helpers.
 import csv
 import io
+# Logging for ingestion failures and normalization diagnostics.
+import logging
 # Dataclass used as normalized event record.
 from dataclasses import dataclass
 # Datetime parser for order timestamp normalization.
@@ -20,6 +22,9 @@ COLUMN_ALIASES = {
     "refunded_amount": ["refunded_amount", "refund_total", "total_refunded", "refunds"],
     "currency": ["currency", "presentment_currency", "shop_currency"],
 }
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -68,6 +73,7 @@ def _parse_float(raw: str, field_name: str) -> float:
         # Parse as floating-point number.
         return float(value)
     except ValueError as exc:
+        logger.warning("Invalid numeric value for %s: %r", field_name, raw)
         # Raise normalization-specific error with field context.
         raise CSVNormalizationError(f"Invalid numeric value in {field_name}: '{raw}'") from exc
 
@@ -78,6 +84,7 @@ def _parse_datetime(raw: str) -> datetime:
     value = (raw or "").strip()
     # Date is mandatory for time-based analysis.
     if not value:
+        logger.warning("Missing order date during normalization")
         raise CSVNormalizationError("Missing order date")
 
     # Support ISO-like UTC timestamps with trailing Z.
@@ -105,15 +112,18 @@ def _parse_datetime(raw: str) -> datetime:
         except ValueError:
             continue
     # If no parser worked, surface explicit normalization error.
+    logger.warning("Could not parse order_date value: %r", raw)
     raise CSVNormalizationError(f"Could not parse order_date value: '{raw}'")
 
 
 def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[NormalizedOrderEvent]:
     """Normalize raw CSV text into sorted normalized order events."""
+    logger.info("Starting CSV normalization")
     # Parse CSV rows into dicts keyed by header columns.
     reader = csv.DictReader(io.StringIO(csv_text))
     # Header row is required for alias-based field resolution.
     if not reader.fieldnames:
+        logger.warning("CSV normalization failed: no header row")
         raise CSVNormalizationError("CSV has no header row")
 
     # Drop empty header values and preserve original names.
@@ -125,6 +135,7 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
     missing_required = [field for field in REQUIRED_FIELDS if not selected.get(field)]
     if missing_required:
         missing = ", ".join(missing_required)
+        logger.warning("CSV missing required columns: %s", missing)
         raise CSVNormalizationError(
             f"CSV missing required columns: {missing}. Accepted aliases include: {COLUMN_ALIASES}"
         )
@@ -147,6 +158,7 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
             refunded_amount = _parse_float(str(row.get(selected["refunded_amount"], "")), "refunded_amount")
         except CSVNormalizationError as exc:
             # Attach row number for user-friendly debugging.
+            logger.warning("CSV normalization failed at row %s: %s", row_index, exc)
             raise CSVNormalizationError(f"Row {row_index}: {exc}") from exc
 
         # Resolve currency from mapped column or fallback default.
@@ -169,8 +181,10 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
 
     # Ensure at least one valid event exists.
     if not events:
+        logger.warning("CSV normalization produced no valid rows")
         raise CSVNormalizationError("No valid rows found in CSV")
 
     # Sort chronologically for deterministic downstream computations.
     events.sort(key=lambda e: e.ordered_at)
+    logger.info("CSV normalization completed successfully with %s events", len(events))
     return events

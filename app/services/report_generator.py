@@ -1,9 +1,15 @@
+# Logging for report summary creation.
+import logging
 from typing import List, Tuple
 
 from app.models.schemas import DiagnosisBlock, FeatureSnapshot, LeakFinding
 
 
+logger = logging.getLogger(__name__)
+
+
 def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tuple[str, DiagnosisBlock]:
+    logger.info("Building report for %s finding(s)", len(findings))
     if findings:
         top = findings[0]
         summary = (
@@ -15,6 +21,7 @@ def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tupl
             likely_why=top.likely_why,
             what_to_do=top.what_to_do,
         )
+        logger.info("Report built with primary finding: %s", top.id)
         return summary, diagnosis
 
     wow = features.week_over_week_revenue_change_pct
@@ -30,4 +37,5 @@ def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tupl
         likely_why="Customer and purchase pattern variance remains within expected range.",
         what_to_do="Keep feeding fresh order data weekly and tune thresholds as signal quality improves.",
     )
+    logger.info("Report built with no critical leak detected")
     return summary, diagnosis

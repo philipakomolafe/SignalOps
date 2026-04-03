@@ -1,8 +1,10 @@
-# Standard library imports for hashing, tokens, and filesystem paths.
+# Standard library imports for hashing, logging, timing, tokens, and filesystem paths.
 import hashlib
 import hmac
+import logging
 import os
 import secrets
+import time
 from pathlib import Path
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
@@ -50,6 +52,15 @@ from app.services.persistence import (
 from app.services.report_generator import build_report
 
 
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+
+logger = logging.getLogger(__name__)
+
+
 # FastAPI application object with metadata used by docs/clients.
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 
@@ -66,6 +77,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log request/response lifecycle for observability."""
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("Unhandled error during %s %s", request.method, request.url.path)
+        raise
+
+    elapsed = time.perf_counter() - started_at
+    logger.info("%s %s -> %s in %.3fs", request.method, request.url.path, response.status_code, elapsed)
+    return response
 
 
 @app.middleware("http")
@@ -183,8 +209,13 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
 @app.on_event("startup")
 def startup() -> None:
     """Initialize storage schema/resources when app starts."""
-    # Ensure SQLite tables/indexes exist before handling requests.
-    init_storage()
+    logger.info("Initializing storage backend")
+    try:
+        init_storage()
+    except Exception:
+        logger.exception("Storage initialization failed")
+        raise
+    logger.info("Storage initialized successfully")
 
 
 @app.get("/health")
@@ -220,9 +251,11 @@ def signup(payload: SignupRequest) -> SignupResponse:
             password_hash=_hash_password(payload.password),
         )
     except DuplicateEmailError as exc:
+        logger.warning("Signup rejected for duplicate email: %s", str(payload.email).strip().lower())
         # Unique email conflict returns explicit 409 response.
         raise HTTPException(status_code=409, detail="Email is already registered") from exc
 
+    logger.info("Signup created for email: %s", created.get("email"))
     # Return typed signup response payload.
     return SignupResponse(**created)
 
@@ -234,12 +267,15 @@ def login(payload: LoginRequest) -> LoginResponse:
     user = get_user_by_email(str(payload.email))
     # Reject unknown users and invalid password combinations.
     if not user or not _verify_password(payload.password, user["password_hash"]):
+        logger.warning("Login failed for email: %s", str(payload.email).strip().lower())
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Generate random session token for this login.
     token = secrets.token_urlsafe(36)
     # Store only hashed token in DB session table.
     create_session(user_id=user["user_id"], token_hash=_hash_token(token))
+
+    logger.info("Login succeeded for user_id=%s email=%s", user["user_id"], user["email"])
 
     # Return token + public user profile.
     return LoginResponse(
@@ -268,6 +304,7 @@ def logout(authorization: str | None = Header(default=None)) -> dict:
     token = _extract_bearer_token(authorization)
     # Remove token hash from session store.
     revoke_session(_hash_token(token))
+    logger.info("Logout completed")
     # Return generic success payload.
     return {"status": "ok"}
 
@@ -306,6 +343,7 @@ async def analyze_csv(
     current_user: dict = Depends(get_current_user),
 ) -> AnalysisResponse:
     """Analyze uploaded CSV, detect leaks, and persist result."""
+    logger.info("Analysis requested by user_id=%s segment=%s file=%s", current_user["user_id"], segment, file.filename)
     # Require a filename to identify uploaded file.
     if not file.filename:
         raise HTTPException(status_code=400, detail="Upload a CSV file")
@@ -329,6 +367,12 @@ async def analyze_csv(
     )
     # Return cached analysis immediately when available.
     if cached_payload:
+        logger.info(
+            "Cache hit for user_id=%s file=%s segment=%s",
+            current_user["user_id"],
+            file.filename,
+            segment,
+        )
         cached_payload["from_cache"] = True
         # Prefer current filename if upload has one.
         cached_payload["source_file"] = file.filename or cached_payload.get("source_file")
@@ -345,6 +389,7 @@ async def analyze_csv(
         # Normalize external CSV into canonical event records.
         events = normalize_orders_csv(csv_text=csv_text)
     except CSVNormalizationError as exc:
+        logger.warning("CSV normalization failed for file=%s user_id=%s: %s", file.filename, current_user["user_id"], exc)
         # Expose normalization problems as 400 for frontend display.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -355,6 +400,14 @@ async def analyze_csv(
     findings = detect_leaks(features, windows)
     # Build user-readable summary and diagnosis sections.
     summary, diagnosis = build_report(features, findings)
+
+    logger.info(
+        "Analysis generated for user_id=%s file=%s findings=%s from_cache=%s",
+        current_user["user_id"],
+        file.filename,
+        len(findings),
+        False,
+    )
 
     # Construct in-memory response payload.
     response = AnalysisResponse(
@@ -368,14 +421,18 @@ async def analyze_csv(
     )
 
     # Persist analysis for history browsing and future cache hits.
-    persisted = save_analysis(
-        user_id=current_user["user_id"],
-        source_file=file.filename,
-        segment=segment,
-        summary=summary,
-        payload=response.model_dump(),
-        content_hash=content_hash,
-    )
+    try:
+        persisted = save_analysis(
+            user_id=current_user["user_id"],
+            source_file=file.filename,
+            segment=segment,
+            summary=summary,
+            payload=response.model_dump(),
+            content_hash=content_hash,
+        )
+    except Exception:
+        logger.exception("Failed to persist analysis for user_id=%s file=%s", current_user["user_id"], file.filename)
+        raise
     # Attach persistence metadata to response.
     response.run_id = persisted["run_id"]
     response.created_at = persisted["created_at"]

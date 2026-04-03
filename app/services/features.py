@@ -1,5 +1,7 @@
 # Helpers for grouping and aggregation operations.
 from collections import defaultdict
+# Logging for analysis diagnostics.
+import logging
 # Date arithmetic for comparison windows.
 from datetime import date, timedelta
 # Mean computation for interval-based metrics.
@@ -11,6 +13,9 @@ from typing import Dict, List, Optional, Tuple
 from app.models.schemas import CohortRetentionPoint, FeatureSnapshot
 # Normalized event shape produced by ingestion service.
 from app.services.ingestion import NormalizedOrderEvent
+
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_pct_change(current: float, previous: float) -> Optional[float]:
@@ -126,6 +131,7 @@ def _window_repeat_and_interval(
 
 def generate_feature_snapshot(events: List[NormalizedOrderEvent]) -> FeatureSnapshot:
     """Generate all primary features consumed by leak detection and reporting."""
+    logger.info("Generating feature snapshot for %s events", len(events))
     # Build customer timelines for customer-centric metrics.
     by_customer: Dict[str, List[NormalizedOrderEvent]] = defaultdict(list)
     for event in events:
@@ -159,7 +165,7 @@ def generate_feature_snapshot(events: List[NormalizedOrderEvent]) -> FeatureSnap
     avg_purchase_interval = _average_purchase_interval(by_customer)
 
     # Return typed feature snapshot rounded for UI readability.
-    return FeatureSnapshot(
+    snapshot = FeatureSnapshot(
         total_revenue=round(total_revenue, 2),
         order_count=order_count,
         customer_count=customer_count,
@@ -182,8 +188,17 @@ def generate_feature_snapshot(events: List[NormalizedOrderEvent]) -> FeatureSnap
     )
 
 
+
+    logger.info(
+        "Feature snapshot ready: revenue=%.2f orders=%s customers=%s",
+        snapshot.total_revenue,
+        snapshot.order_count,
+        snapshot.customer_count,
+    )
+    return snapshot
 def compute_comparison_windows(events: List[NormalizedOrderEvent]) -> Dict[str, Optional[float]]:
     """Compute recent vs previous window comparison metrics for leak heuristics."""
+    logger.info("Computing comparison windows for %s events", len(events))
     # Anchor on latest event date.
     latest_day = events[-1].ordered_at.date()
 
@@ -199,9 +214,12 @@ def compute_comparison_windows(events: List[NormalizedOrderEvent]) -> Dict[str, 
     prev_repeat_rate, prev_interval = _window_repeat_and_interval(events, prev_start, prev_end)
 
     # Return rounded comparison values used by leak engine.
-    return {
+    result = {
         "recent_repeat_rate": round(recent_repeat_rate, 2) if recent_repeat_rate is not None else None,
         "previous_repeat_rate": round(prev_repeat_rate, 2) if prev_repeat_rate is not None else None,
         "recent_purchase_interval": round(recent_interval, 2) if recent_interval is not None else None,
         "previous_purchase_interval": round(prev_interval, 2) if prev_interval is not None else None,
     }
+
+    logger.info("Comparison windows computed")
+    return result

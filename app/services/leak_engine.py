@@ -1,6 +1,11 @@
+# Logging for leak rule evaluation.
+import logging
 from typing import Dict, List, Optional
 
 from app.models.schemas import FeatureSnapshot, LeakFinding
+
+
+logger = logging.getLogger(__name__)
 
 
 def _severity_from_drop(drop_pct: float) -> str:
@@ -15,6 +20,7 @@ def detect_leaks(
     features: FeatureSnapshot,
     comparison_windows: Dict[str, Optional[float]],
 ) -> List[LeakFinding]:
+    logger.info("Evaluating leak rules")
     findings: List[LeakFinding] = []
 
     wow = features.week_over_week_revenue_change_pct
@@ -98,4 +104,5 @@ def detect_leaks(
             )
         )
 
+    logger.info("Leak rule evaluation produced %s finding(s)", len(findings))
     return findings

@@ -7,6 +7,8 @@ from pathlib import Path
 # Type hints used in repository-like functions.
 from typing import Any, Dict, List, Optional
 
+import logging
+
 # App settings source (includes DB path).
 from app.configs.settings import settings
 
@@ -19,6 +21,9 @@ except ImportError:  # pragma: no cover - exercised only when dependency is abse
     psycopg = None
     pg_errors = None
     dict_row = None
+
+
+logger = logging.getLogger(__name__)
 
 
 class DuplicateEmailError(ValueError):
@@ -54,10 +59,13 @@ def _connect() -> Any:
     """Create database connection for configured backend."""
     if _is_postgres():
         if psycopg is None:
+            logger.error("PostgreSQL URL configured but psycopg is not installed")
             raise RuntimeError("PostgreSQL URL configured but psycopg is not installed")
+        logger.debug("Opening PostgreSQL connection")
         return psycopg.connect(_normalize_postgres_url(_database_url()), row_factory=dict_row)
 
     # Fallback backend: local SQLite file.
+    logger.debug("Opening SQLite connection at %s", _db_path())
     connection = sqlite3.connect(_db_path())
     connection.row_factory = sqlite3.Row
     return connection
@@ -88,6 +96,7 @@ def _is_unique_violation(exc: Exception) -> bool:
 
 def init_storage() -> None:
     """Initialize database schema and indexes (migration-safe)."""
+    logger.info("Initializing storage for %s backend", "postgres" if _is_postgres() else "sqlite")
     if not _is_postgres():
         # Ensure parent directory for SQLite DB file exists.
         db_path = _db_path()
@@ -110,6 +119,7 @@ def init_storage() -> None:
                 )
                 """,
             )
+            logger.debug("Ensured PostgreSQL analysis_runs table exists")
 
             columns = {
                 str(row["column_name"])
@@ -155,6 +165,7 @@ def init_storage() -> None:
                 )
                 """,
             )
+            logger.debug("Ensured PostgreSQL users table exists")
             _execute(
                 connection,
                 """
@@ -167,6 +178,7 @@ def init_storage() -> None:
                 )
                 """,
             )
+            logger.debug("Ensured PostgreSQL user_sessions table exists")
             _execute(
                 connection,
                 """
@@ -192,6 +204,7 @@ def init_storage() -> None:
             )
             """,
         )
+        logger.debug("Ensured SQLite analysis_runs table exists")
 
         columns = {
             row["name"]
@@ -230,6 +243,7 @@ def init_storage() -> None:
             )
             """,
         )
+        logger.debug("Ensured SQLite users table exists")
         _execute(
             connection,
             """
@@ -242,6 +256,7 @@ def init_storage() -> None:
             )
             """,
         )
+        logger.debug("Ensured SQLite user_sessions table exists")
         _execute(
             connection,
             """
@@ -261,6 +276,7 @@ def save_analysis(
     content_hash: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Insert analysis run row and return run metadata."""
+    logger.info("Saving analysis for user_id=%s segment=%s source_file=%s", user_id, segment, source_file)
     with _connect() as connection:
         payload_json = json.dumps(payload)
         if _is_postgres():
@@ -274,6 +290,7 @@ def save_analysis(
                 (user_id, source_file, segment, summary, content_hash, payload_json),
             ).fetchone()
             connection.commit()
+            logger.info("Saved PostgreSQL analysis run_id=%s", row["run_id"])
             return {
                 "run_id": int(row["run_id"]),
                 "created_at": str(row["created_at"]),
@@ -294,6 +311,7 @@ def save_analysis(
             (run_id,),
         ).fetchone()
         connection.commit()
+        logger.info("Saved SQLite analysis run_id=%s", run_id)
 
     return {
         "run_id": run_id,
@@ -386,6 +404,7 @@ def create_signup(
     """Create a new user account row and return user profile fields."""
     normalized_email = email.strip().lower()
     safe_company = (company or "").strip() or None
+    logger.info("Creating signup for email=%s", normalized_email)
 
     try:
         with _connect() as connection:
@@ -418,7 +437,9 @@ def create_signup(
                 connection.commit()
     except Exception as exc:
         if _is_unique_violation(exc):
+            logger.warning("Duplicate signup attempt for email=%s", normalized_email)
             raise DuplicateEmailError("Email is already registered") from exc
+        logger.exception("Signup creation failed for email=%s", normalized_email)
         raise
 
     if not row:
@@ -436,6 +457,7 @@ def create_signup(
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Fetch user row by normalized email, including password hash."""
     normalized_email = email.strip().lower()
+    logger.debug("Looking up user by email=%s", normalized_email)
     with _connect() as connection:
         row = _execute(
             connection,
@@ -461,6 +483,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
 
 def create_session(user_id: int, token_hash: str) -> Dict[str, Any]:
     """Create session record for authenticated user token hash."""
+    logger.info("Creating session for user_id=%s", user_id)
     with _connect() as connection:
         if _is_postgres():
             row = _execute(
@@ -473,6 +496,7 @@ def create_session(user_id: int, token_hash: str) -> Dict[str, Any]:
                 (user_id, token_hash),
             ).fetchone()
             connection.commit()
+            logger.info("Created PostgreSQL session_id=%s for user_id=%s", row["session_id"], user_id)
             return {
                 "session_id": int(row["session_id"]),
                 "created_at": str(row["created_at"]),
@@ -493,6 +517,7 @@ def create_session(user_id: int, token_hash: str) -> Dict[str, Any]:
             (session_id,),
         ).fetchone()
         connection.commit()
+        logger.info("Created SQLite session_id=%s for user_id=%s", session_id, user_id)
 
     return {
         "session_id": session_id,
@@ -503,6 +528,7 @@ def create_session(user_id: int, token_hash: str) -> Dict[str, Any]:
 def get_user_by_session_hash(token_hash: str) -> Optional[Dict[str, Any]]:
     """Resolve active session token hash to user profile."""
     with _connect() as connection:
+        logger.debug("Resolving session hash to user")
         row = _execute(
             connection,
             """
@@ -529,6 +555,7 @@ def get_user_by_session_hash(token_hash: str) -> Optional[Dict[str, Any]]:
 
 def revoke_session(token_hash: str) -> None:
     """Mark active session as revoked for logout."""
+    logger.info("Revoking session token hash")
     with _connect() as connection:
         _execute(
             connection,
