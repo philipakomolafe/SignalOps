@@ -1,4 +1,14 @@
-import { analyzeCsv, fetchAnalysisById, fetchAnalysisHistory, fetchCurrentUser, logout } from "./api.js";
+import {
+  analyzeCsv,
+  disconnectShopify,
+  fetchAnalysisById,
+  fetchAnalysisHistory,
+  fetchCurrentUser,
+  fetchShopifyStatus,
+  logout,
+  runShopifyMonitorNow,
+  startShopifyConnect,
+} from "./api.js";
 import { TOKEN_STORAGE_KEY } from "./config.js";
 import { renderAnalysis, renderHistoryList, renderUploadEvent, resetFeed } from "./render.js";
 
@@ -14,6 +24,11 @@ const userNameEl = document.getElementById("user-name");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
 const logoutBtn = document.getElementById("logout-btn");
+const shopDomainInputEl = document.getElementById("shop-domain-input");
+const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
+const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
+const shopifySyncBtn = document.getElementById("shopify-sync-btn");
+const shopifyStatusEl = document.getElementById("shopify-status");
 let currentRunId = null;
 
 function runIdToConversationId(runId) {
@@ -79,6 +94,42 @@ function setRunningState(isRunning) {
   if (!runButton) return;
   runButton.disabled = isRunning;
   runButton.textContent = isRunning ? "Running..." : "Run Analysis";
+}
+
+function setShopifyStatus(message, isError = false) {
+  if (!shopifyStatusEl) return;
+  shopifyStatusEl.textContent = message;
+  shopifyStatusEl.classList.toggle("error", isError);
+}
+
+function setShopifyButtonsDisabled(disabled) {
+  [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn].forEach((button) => {
+    if (button) button.disabled = disabled;
+  });
+}
+
+async function loadShopifyStatus() {
+  try {
+    const status = await fetchShopifyStatus();
+    if (!status.connected) {
+      setShopifyStatus("No Shopify connection yet.");
+      return;
+    }
+
+    if (shopDomainInputEl && status.shop_domain) {
+      shopDomainInputEl.value = status.shop_domain;
+    }
+
+    const synced = status.last_synced_at ? ` Last sync: ${status.last_synced_at}.` : "";
+    setShopifyStatus(`Connected: ${status.shop_domain || "store"}.${synced}`);
+  } catch (error) {
+    if (error.message === "AUTH_REQUIRED") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
+      return;
+    }
+    setShopifyStatus(error.message || "Failed to fetch Shopify status.", true);
+  }
 }
 
 function showSingleAnalysis(payload, fileName = null) {
@@ -218,6 +269,73 @@ if (logoutBtn) {
   });
 }
 
+if (shopifyConnectBtn) {
+  shopifyConnectBtn.addEventListener("click", async () => {
+    const shopDomain = shopDomainInputEl?.value?.trim();
+    if (!shopDomain) {
+      setShopifyStatus("Enter your Shopify domain first.", true);
+      return;
+    }
+
+    setShopifyButtonsDisabled(true);
+    setShopifyStatus("Preparing Shopify connection...");
+    try {
+      const result = await startShopifyConnect(shopDomain);
+      window.location.href = result.auth_url;
+    } catch (error) {
+      if (error.message === "AUTH_REQUIRED") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        redirectToLogin();
+        return;
+      }
+      setShopifyStatus(error.message || "Failed to start Shopify connect flow.", true);
+      setShopifyButtonsDisabled(false);
+    }
+  });
+}
+
+if (shopifyDisconnectBtn) {
+  shopifyDisconnectBtn.addEventListener("click", async () => {
+    setShopifyButtonsDisabled(true);
+    try {
+      await disconnectShopify();
+      if (shopDomainInputEl) shopDomainInputEl.value = "";
+      setShopifyStatus("Shopify connection removed.");
+    } catch (error) {
+      if (error.message === "AUTH_REQUIRED") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        redirectToLogin();
+        return;
+      }
+      setShopifyStatus(error.message || "Failed to disconnect Shopify.", true);
+    } finally {
+      setShopifyButtonsDisabled(false);
+    }
+  });
+}
+
+if (shopifySyncBtn) {
+  shopifySyncBtn.addEventListener("click", async () => {
+    setShopifyButtonsDisabled(true);
+    setShopifyStatus("Running monitor now...");
+    try {
+      const result = await runShopifyMonitorNow();
+      setShopifyStatus(`Monitor complete. Analyses: ${result.triggered_analyses}.`);
+      await loadHistory();
+      await loadShopifyStatus();
+    } catch (error) {
+      if (error.message === "AUTH_REQUIRED") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        redirectToLogin();
+        return;
+      }
+      setShopifyStatus(error.message || "Failed to run monitor.", true);
+    } finally {
+      setShopifyButtonsDisabled(false);
+    }
+  });
+}
+
 if (userToggleBtn && userActionsEl) {
   userToggleBtn.addEventListener("click", () => {
     const isOpen = !userActionsEl.hidden;
@@ -239,6 +357,7 @@ async function bootstrap() {
       userNameEl.textContent = me.full_name || fallbackName;
     }
     await loadHistory();
+    await loadShopifyStatus();
 
     const conversationId = readConversationIdFromHash();
     if (conversationId) {

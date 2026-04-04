@@ -3,6 +3,10 @@ import { ANALYSIS_ENDPOINT, API_BASE, SEGMENT, TOKEN_STORAGE_KEY } from "./confi
 const HISTORY_ENDPOINT = `${ANALYSIS_ENDPOINT.replace("/analyze", "")}/history`;
 const ME_ENDPOINT = `${API_BASE}/api/v1/auth/me`;
 const LOGOUT_ENDPOINT = `${API_BASE}/api/v1/auth/logout`;
+const SHOPIFY_CONNECT_START_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/connect/start`;
+const SHOPIFY_STATUS_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/status`;
+const SHOPIFY_DISCONNECT_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/disconnect`;
+const SHOPIFY_MONITOR_NOW_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/monitor-now`;
 
 function authHeaders(extraHeaders = {}) {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -68,4 +72,36 @@ export async function logout() {
     headers: authHeaders(),
   });
   return parseResponse(response, "Logout failed.");
+}
+
+export async function startShopifyConnect(shopDomain) {
+  const response = await fetch(SHOPIFY_CONNECT_START_ENDPOINT, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ shop_domain: shopDomain }),
+  });
+  return parseResponse(response, "Failed to start Shopify connection.");
+}
+
+export async function fetchShopifyStatus() {
+  const response = await fetch(SHOPIFY_STATUS_ENDPOINT, {
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "Failed to fetch Shopify status.");
+}
+
+export async function disconnectShopify() {
+  const response = await fetch(SHOPIFY_DISCONNECT_ENDPOINT, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "Failed to disconnect Shopify.");
+}
+
+export async function runShopifyMonitorNow() {
+  const response = await fetch(SHOPIFY_MONITOR_NOW_ENDPOINT, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "Failed to run Shopify monitor.");
 }

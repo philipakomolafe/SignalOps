@@ -167,6 +167,82 @@
 
 .user-actions {
   display: grid;
+  gap: 6px;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #d6deea;
+  border-radius: 9px;
+  background: #ffffff;
+  padding: 7px;
+}
+
+.settings-stack h4 {
+  margin: 0;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #334155;
+}
+
+.settings-label {
+  font-size: 0.68rem;
+  color: #4b5563;
+}
+
+.settings-input {
+  width: 100%;
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  padding: 0.36rem 0.45rem;
+  font-size: 0.74rem;
+  color: #1f2937;
+}
+
+.settings-input:focus {
+  outline: 2px solid #d8e4ff;
+  outline-offset: 1px;
+}
+
+.settings-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+#shopify-connect-btn,
+#shopify-disconnect-btn,
+#shopify-sync-btn {
+  width: 100%;
+  border: 1px solid #cfd8e3;
+  background: #fff;
+  color: #243044;
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#shopify-connect-btn:hover,
+#shopify-disconnect-btn:hover,
+#shopify-sync-btn:hover {
+  background: #f2f6fb;
+}
+
+#shopify-sync-btn {
+  background: #eef4ff;
+  border-color: #c6d5f6;
+}
+
+.settings-note {
+  margin: 0;
+  font-size: 0.69rem;
+  color: #526174;
+  line-height: 1.35;
 }
 
 #logout-btn {
@@ -456,6 +532,29 @@
   #logout-btn {
     font-size: 0.68rem;
     padding: 0.35rem 0.3rem;
+  }
+
+  .settings-stack h4,
+  .settings-label,
+  .settings-note {
+    display: none;
+  }
+
+  .settings-input {
+    font-size: 0.66rem;
+    padding: 0.3rem 0.32rem;
+  }
+
+  .settings-actions-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  #shopify-connect-btn,
+  #shopify-disconnect-btn,
+  #shopify-sync-btn {
+    font-size: 0.64rem;
+    padding: 0.32rem 0.28rem;
   }
 
   .metrics-grid,

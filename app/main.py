@@ -355,6 +355,62 @@ def _run_analysis_from_events(
     return response
 
 
+def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
+    """Run one monitor cycle for a single Shopify connection.
+
+    Returns True when a fresh analysis is persisted, else False.
+    """
+    orders = fetch_orders(
+        shop_domain=connection["shop_domain"],
+        access_token=connection["access_token"],
+        updated_at_min=connection.get("last_synced_at"),
+    )
+    if not orders:
+        save_monitor_run(
+            user_id=connection["user_id"],
+            shop_domain=connection["shop_domain"],
+            segment=segment,
+            status="no_data",
+            detail={"message": "No new orders returned"},
+        )
+        return False
+
+    events = normalize_shopify_orders(orders)
+    content_hash = hashlib.sha256(json.dumps(orders, sort_keys=True).encode("utf-8")).hexdigest()
+    cached = find_analysis_by_hash(
+        content_hash=content_hash,
+        segment=segment,
+        user_id=connection["user_id"],
+    )
+    if cached:
+        mark_shopify_connection_synced(connection["user_id"])
+        save_monitor_run(
+            user_id=connection["user_id"],
+            shop_domain=connection["shop_domain"],
+            segment=segment,
+            status="cached",
+            detail={"run_id": cached.get("run_id")},
+        )
+        return False
+
+    response = _run_analysis_from_events(
+        user_id=connection["user_id"],
+        segment=segment,
+        source_file=f"shopify:{connection['shop_domain']}",
+        events=events,
+        content_hash=content_hash,
+    )
+    mark_shopify_connection_synced(connection["user_id"])
+    save_monitor_run(
+        user_id=connection["user_id"],
+        shop_domain=connection["shop_domain"],
+        segment=segment,
+        status="ok",
+        detail={"run_id": response.run_id, "findings": len(response.findings)},
+    )
+    return True
+
+
 @app.post("/api/v1/srl/analyze", response_model=AnalysisResponse)
 async def analyze_csv(
     file: UploadFile = File(...),
@@ -524,6 +580,30 @@ async def shopify_orders_webhook(
     return {"status": "ok"}
 
 
+@app.post("/api/v1/integrations/shopify/monitor-now", response_model=MonitorRunResponse)
+def run_shopify_monitor_now(current_user: dict = Depends(get_current_user)) -> MonitorRunResponse:
+    """Run monitor immediately for the authenticated user's connected store."""
+    segment = "shopify-5k-25k"
+    connection = get_shopify_connection_by_user(current_user["user_id"])
+    if not connection:
+        raise HTTPException(status_code=404, detail="No active Shopify connection found")
+
+    try:
+        created = _run_shopify_monitor_for_connection(connection, segment=segment)
+    except Exception as exc:
+        logger.exception("Shopify monitor-now failed for shop=%s", connection["shop_domain"])
+        save_monitor_run(
+            user_id=connection["user_id"],
+            shop_domain=connection["shop_domain"],
+            segment=segment,
+            status="error",
+            detail={"error": str(exc)},
+        )
+        raise HTTPException(status_code=502, detail="Monitor run failed for connected store") from exc
+
+    return MonitorRunResponse(processed_stores=1, triggered_analyses=1 if created else 0)
+
+
 @app.post("/api/v1/monitor/run/shopify", response_model=MonitorRunResponse)
 def run_shopify_monitor(
     x_monitor_token: str | None = Header(default=None),
@@ -540,55 +620,9 @@ def run_shopify_monitor(
     for connection in list_active_shopify_connections(limit=limit):
         processed += 1
         try:
-            orders = fetch_orders(
-                shop_domain=connection["shop_domain"],
-                access_token=connection["access_token"],
-                updated_at_min=connection.get("last_synced_at"),
-            )
-            if not orders:
-                save_monitor_run(
-                    user_id=connection["user_id"],
-                    shop_domain=connection["shop_domain"],
-                    segment=segment,
-                    status="no_data",
-                    detail={"message": "No new orders returned"},
-                )
-                continue
-
-            events = normalize_shopify_orders(orders)
-            content_hash = hashlib.sha256(json.dumps(orders, sort_keys=True).encode("utf-8")).hexdigest()
-            cached = find_analysis_by_hash(
-                content_hash=content_hash,
-                segment=segment,
-                user_id=connection["user_id"],
-            )
-            if cached:
-                mark_shopify_connection_synced(connection["user_id"])
-                save_monitor_run(
-                    user_id=connection["user_id"],
-                    shop_domain=connection["shop_domain"],
-                    segment=segment,
-                    status="cached",
-                    detail={"run_id": cached.get("run_id")},
-                )
-                continue
-
-            response = _run_analysis_from_events(
-                user_id=connection["user_id"],
-                segment=segment,
-                source_file=f"shopify:{connection['shop_domain']}",
-                events=events,
-                content_hash=content_hash,
-            )
-            mark_shopify_connection_synced(connection["user_id"])
-            save_monitor_run(
-                user_id=connection["user_id"],
-                shop_domain=connection["shop_domain"],
-                segment=segment,
-                status="ok",
-                detail={"run_id": response.run_id, "findings": len(response.findings)},
-            )
-            analyses += 1
+            created = _run_shopify_monitor_for_connection(connection, segment=segment)
+            if created:
+                analyses += 1
         except Exception as exc:
             logger.exception("Shopify monitor failed for shop=%s", connection["shop_domain"])
             save_monitor_run(

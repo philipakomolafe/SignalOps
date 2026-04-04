@@ -45,6 +45,17 @@
           <span id="user-name">User</span>
         </button>
         <div id="user-actions" class="user-actions" hidden>
+          <section class="settings-stack" aria-label="Integration settings">
+            <h4>Settings</h4>
+            <label class="settings-label" for="shop-domain-input">Shopify store</label>
+            <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
+            <div class="settings-actions-row">
+              <button id="shopify-connect-btn" type="button">Connect</button>
+              <button id="shopify-disconnect-btn" type="button">Disconnect</button>
+            </div>
+            <button id="shopify-sync-btn" type="button">Sync Now</button>
+            <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
+          </section>
           <button id="logout-btn" type="button">Log out</button>
         </div>
       </div>
