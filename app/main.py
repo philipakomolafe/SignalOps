@@ -1,6 +1,6 @@
 # Standard library imports for hashing, logging, timing, tokens, and filesystem paths.
 import hashlib
-import hmac
+import json
 import logging
 import os
 import secrets
@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 # CORS middleware allows browser clients from configured origins to call the API.
 from fastapi.middleware.cors import CORSMiddleware
 # RedirectResponse is used for canonical URL redirects and root redirects.
@@ -25,31 +25,62 @@ from app.models.schemas import (
     AnalysisResponse,
     LoginRequest,
     LoginResponse,
+    MonitorRunResponse,
+    ShopifyConnectionStatusResponse,
+    ShopifyConnectStartRequest,
+    ShopifyConnectStartResponse,
     SignupRequest,
     SignupResponse,
 )
 # Feature engineering helpers for analytics calculations.
 from app.services.features import compute_comparison_windows, generate_feature_snapshot
 # CSV normalization helper and explicit normalization error type.
-from app.services.ingestion import CSVNormalizationError, normalize_orders_csv
+from app.services.ingestion import CSVNormalizationError, normalize_orders_csv, normalize_shopify_orders
 # Leak rule engine that generates findings from computed features.
 from app.services.leak_engine import detect_leaks
+# Auth utility helpers to keep this module focused on API orchestration.
+from app.services.auth_utils import (
+    extract_bearer_token,
+    hash_password,
+    hash_token,
+    mask_email,
+    verify_password,
+)
 # Persistence layer for users, sessions, analysis history, and caching.
 from app.services.persistence import (
     DuplicateEmailError,
     create_signup,
     create_session,
+    deactivate_shopify_connection,
     find_analysis_by_hash,
     get_analysis,
+    get_shopify_connection_by_user,
     get_user_by_email,
     get_user_by_session_hash,
     init_storage,
     list_analyses,
+    list_active_shopify_connections,
+    mark_shopify_connection_synced,
     revoke_session,
+    save_monitor_run,
     save_analysis,
+    upsert_shopify_connection,
 )
 # Report builder that converts findings into summary + diagnosis text.
 from app.services.report_generator import build_report
+from app.services.shopify import (
+    build_install_url,
+    build_oauth_state,
+    exchange_code_for_token,
+    fetch_orders,
+    normalize_shop_domain,
+    parse_oauth_state,
+    verify_callback_hmac,
+    verify_webhook_hmac,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 if not logging.getLogger().handlers:
@@ -57,26 +88,6 @@ if not logging.getLogger().handlers:
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
-
-logger = logging.getLogger(__name__)
-
-
-def _mask_email(value: str | None) -> str:
-    """Return a partially masked email string for safe logging."""
-    email = (value or "").strip().lower()
-    if not email or "@" not in email:
-        return "***"
-
-    local, domain = email.split("@", 1)
-    masked_local = f"{local[:1]}***" if local else "***"
-    if "." in domain:
-        host, suffix = domain.rsplit(".", 1)
-        masked_host = f"{host[:1]}***" if host else "***"
-        masked_domain = f"{masked_host}.{suffix}"
-    else:
-        masked_domain = f"{domain[:1]}***" if domain else "***"
-
-    return f"{masked_local}@{masked_domain}"
 
 
 # FastAPI application object with metadata used by docs/clients.
@@ -159,64 +170,15 @@ if WEB_ROOT.exists():
     app.mount("/v1", StaticFiles(directory=WEB_ROOT / "v1", html=True), name="v1")
 
 
-def _hash_password(password: str) -> str:
-    """Hash a password with PBKDF2-SHA256 and a random salt."""
-    # Generate a cryptographic random 16-byte salt.
-    salt = os.urandom(16)
-    # Derive hash digest using PBKDF2-HMAC-SHA256.
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120000)
-    # Store as a structured string: scheme$iterations$salt$hash.
-    return f"pbkdf2_sha256$120000${salt.hex()}${digest.hex()}"
-
-
-def _verify_password(password: str, stored: str) -> bool:
-    """Verify a plain password against stored PBKDF2 hash string."""
-    try:
-        # Split stored record into expected parts.
-        scheme, iterations, salt_hex, digest_hex = stored.split("$", 3)
-        # Reject unknown schemes immediately.
-        if scheme != "pbkdf2_sha256":
-            return False
-        # Recompute hash using stored salt/iterations and candidate password.
-        check = hashlib.pbkdf2_hmac(
-            "sha256",
-            password.encode("utf-8"),
-            bytes.fromhex(salt_hex),
-            int(iterations),
-        ).hex()
-        # Constant-time comparison prevents timing side-channel leaks.
-        return hmac.compare_digest(check, digest_hex)
-    except Exception:
-        # Any parse/hash error means verification failed.
-        return False
-
-
-def _hash_token(token: str) -> str:
-    """Hash session token before storage/lookup."""
-    # Never store raw tokens in DB; keep only SHA256 hash.
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
-
-def _extract_bearer_token(authorization: str | None) -> str:
-    """Extract and validate Bearer token from Authorization header."""
-    # Header is required for protected endpoints.
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing authorization token")
-    # Expected format is: "Bearer <token>".
-    parts = authorization.strip().split(" ", 1)
-    # Reject malformed/missing token values.
-    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
-    # Return normalized token value.
-    return parts[1].strip()
-
-
 def get_current_user(authorization: str | None = Header(default=None)) -> dict:
     """Dependency that resolves currently authenticated user from bearer token."""
     # Pull raw token from Authorization header.
-    token = _extract_bearer_token(authorization)
+    try:
+        token = extract_bearer_token(authorization)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
     # Lookup user by hashed token in active sessions.
-    user = get_user_by_session_hash(_hash_token(token))
+    user = get_user_by_session_hash(hash_token(token))
     # Missing user means invalid or revoked/expired session.
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
@@ -266,14 +228,14 @@ def signup(payload: SignupRequest) -> SignupResponse:
             full_name=payload.full_name,
             email=str(payload.email),
             company=payload.company,
-            password_hash=_hash_password(payload.password),
+            password_hash=hash_password(payload.password),
         )
     except DuplicateEmailError as exc:
-        logger.warning("Signup rejected for duplicate email: %s", _mask_email(str(payload.email)))
+        logger.warning("Signup rejected for duplicate email: %s", mask_email(str(payload.email)))
         # Unique email conflict returns explicit 409 response.
         raise HTTPException(status_code=409, detail="Email is already registered") from exc
 
-    logger.info("Signup created for email: %s", _mask_email(str(created.get("email") or "")))
+    logger.info("Signup created for email: %s", mask_email(str(created.get("email") or "")))
     # Return typed signup response payload.
     return SignupResponse(**created)
 
@@ -284,16 +246,16 @@ def login(payload: LoginRequest) -> LoginResponse:
     # Find user by email.
     user = get_user_by_email(str(payload.email))
     # Reject unknown users and invalid password combinations.
-    if not user or not _verify_password(payload.password, user["password_hash"]):
-        logger.warning("Login failed for email: %s", _mask_email(str(payload.email)))
+    if not user or not verify_password(payload.password, user["password_hash"]):
+        logger.warning("Login failed for email: %s", mask_email(str(payload.email)))
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Generate random session token for this login.
     token = secrets.token_urlsafe(36)
     # Store only hashed token in DB session table.
-    create_session(user_id=user["user_id"], token_hash=_hash_token(token))
+    create_session(user_id=user["user_id"], token_hash=hash_token(token))
 
-    logger.info("Login succeeded for user_id=%s email=%s", user["user_id"], _mask_email(str(user["email"])))
+    logger.info("Login succeeded for user_id=%s email=%s", user["user_id"], mask_email(str(user["email"])))
 
     # Return token + public user profile.
     return LoginResponse(
@@ -319,9 +281,12 @@ def me(current_user: dict = Depends(get_current_user)) -> AuthUser:
 def logout(authorization: str | None = Header(default=None)) -> dict:
     """Revoke current session token."""
     # Parse bearer token from Authorization header.
-    token = _extract_bearer_token(authorization)
+    try:
+        token = extract_bearer_token(authorization)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
     # Remove token hash from session store.
-    revoke_session(_hash_token(token))
+    revoke_session(hash_token(token))
     logger.info("Logout completed")
     # Return generic success payload.
     return {"status": "ok"}
@@ -352,6 +317,42 @@ def analysis_by_id(
         raise HTTPException(status_code=404, detail="Analysis run not found")
     # Return typed analysis response.
     return AnalysisResponse(**payload)
+
+
+def _run_analysis_from_events(
+    *,
+    user_id: int,
+    segment: str,
+    source_file: str,
+    events,
+    content_hash: str,
+) -> AnalysisResponse:
+    """Run core analytics pipeline and persist the result."""
+    features = generate_feature_snapshot(events)
+    windows = compute_comparison_windows(events)
+    findings = detect_leaks(features, windows)
+    summary, diagnosis = build_report(features, findings)
+
+    response = AnalysisResponse(
+        segment=segment,
+        summary=summary,
+        features=features,
+        findings=findings,
+        diagnosis=diagnosis,
+        source_file=source_file,
+        from_cache=False,
+    )
+    persisted = save_analysis(
+        user_id=user_id,
+        source_file=source_file,
+        segment=segment,
+        summary=summary,
+        payload=response.model_dump(),
+        content_hash=content_hash,
+    )
+    response.run_id = persisted["run_id"]
+    response.created_at = persisted["created_at"]
+    return response
 
 
 @app.post("/api/v1/srl/analyze", response_model=AnalysisResponse)
@@ -411,48 +412,191 @@ async def analyze_csv(
         # Expose normalization problems as 400 for frontend display.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Compute features and comparison windows used by leak rules.
-    features = generate_feature_snapshot(events)
-    windows = compute_comparison_windows(events)
-    # Detect leak findings from features/windows.
-    findings = detect_leaks(features, windows)
-    # Build user-readable summary and diagnosis sections.
-    summary, diagnosis = build_report(features, findings)
-
-    logger.info(
-        "Analysis generated for user_id=%s file=%s findings=%s from_cache=%s",
-        current_user["user_id"],
-        file.filename,
-        len(findings),
-        False,
-    )
-
-    # Construct in-memory response payload.
-    response = AnalysisResponse(
-        segment=segment,
-        summary=summary,
-        features=features,
-        findings=findings,
-        diagnosis=diagnosis,
-        source_file=file.filename,
-        from_cache=False,
-    )
-
-    # Persist analysis for history browsing and future cache hits.
     try:
-        persisted = save_analysis(
+        response = _run_analysis_from_events(
             user_id=current_user["user_id"],
             source_file=file.filename,
             segment=segment,
-            summary=summary,
-            payload=response.model_dump(),
+            events=events,
             content_hash=content_hash,
         )
     except Exception:
         logger.exception("Failed to persist analysis for user_id=%s file=%s", current_user["user_id"], file.filename)
         raise
-    # Attach persistence metadata to response.
-    response.run_id = persisted["run_id"]
-    response.created_at = persisted["created_at"]
+    logger.info(
+        "Analysis generated for user_id=%s file=%s findings=%s from_cache=%s",
+        current_user["user_id"],
+        file.filename,
+        len(response.findings),
+        False,
+    )
     # Return final analysis payload.
     return response
+
+
+@app.post("/api/v1/integrations/shopify/connect/start", response_model=ShopifyConnectStartResponse)
+def shopify_connect_start(
+    payload: ShopifyConnectStartRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ShopifyConnectStartResponse:
+    """Generate Shopify OAuth install URL for current user."""
+    if not settings.shopify_api_key or not settings.shopify_api_secret:
+        raise HTTPException(status_code=503, detail="Shopify integration is not configured")
+
+    try:
+        shop_domain = normalize_shop_domain(payload.shop_domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    state = build_oauth_state(current_user["user_id"], shop_domain)
+    auth_url = build_install_url(shop_domain, state)
+    return ShopifyConnectStartResponse(auth_url=auth_url, shop_domain=shop_domain)
+
+
+@app.get("/api/v1/integrations/shopify/callback")
+def shopify_connect_callback(request: Request):
+    """Handle Shopify OAuth callback, validate, and persist store token."""
+    query = {key: value for key, value in request.query_params.items()}
+    if not verify_callback_hmac(query):
+        raise HTTPException(status_code=401, detail="Invalid Shopify callback signature")
+
+    shop = query.get("shop")
+    code = query.get("code")
+    state = query.get("state")
+    if not shop or not code or not state:
+        raise HTTPException(status_code=400, detail="Missing required OAuth callback parameters")
+
+    try:
+        state_user_id, state_shop_domain = parse_oauth_state(state)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    normalized_shop = normalize_shop_domain(shop)
+    if normalized_shop != state_shop_domain:
+        raise HTTPException(status_code=400, detail="Shop domain mismatch in OAuth callback")
+
+    token_payload = exchange_code_for_token(normalized_shop, code)
+    access_token = str(token_payload.get("access_token") or "").strip()
+    scope = str(token_payload.get("scope") or "").strip() or None
+    if not access_token:
+        raise HTTPException(status_code=502, detail="Shopify token exchange failed")
+
+    upsert_shopify_connection(
+        user_id=state_user_id,
+        shop_domain=normalized_shop,
+        access_token=access_token,
+        scope=scope,
+    )
+
+    return RedirectResponse(url="/dashboard/?shopify=connected")
+
+
+@app.get("/api/v1/integrations/shopify/status", response_model=ShopifyConnectionStatusResponse)
+def shopify_status(current_user: dict = Depends(get_current_user)) -> ShopifyConnectionStatusResponse:
+    """Return current user's Shopify integration status."""
+    row = get_shopify_connection_by_user(current_user["user_id"])
+    if not row:
+        return ShopifyConnectionStatusResponse(connected=False)
+    return ShopifyConnectionStatusResponse(
+        connected=True,
+        shop_domain=row["shop_domain"],
+        scope=row["scope"],
+        last_synced_at=row["last_synced_at"],
+    )
+
+
+@app.post("/api/v1/integrations/shopify/disconnect")
+def shopify_disconnect(current_user: dict = Depends(get_current_user)) -> dict:
+    """Disconnect Shopify integration for current user."""
+    deactivate_shopify_connection(current_user["user_id"])
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/integrations/shopify/webhook/orders")
+async def shopify_orders_webhook(
+    request: Request,
+    x_shopify_hmac_sha256: str | None = Header(default=None),
+) -> dict:
+    """Accept Shopify order webhooks and validate signature."""
+    body = await request.body()
+    if not verify_webhook_hmac(body, x_shopify_hmac_sha256):
+        raise HTTPException(status_code=401, detail="Invalid Shopify webhook signature")
+    return {"status": "ok"}
+
+
+@app.post("/api/v1/monitor/run/shopify", response_model=MonitorRunResponse)
+def run_shopify_monitor(
+    x_monitor_token: str | None = Header(default=None),
+    limit: int = Query(default=25, ge=1, le=200),
+) -> MonitorRunResponse:
+    """Run autonomous monitor pass over active Shopify connections."""
+    if not settings.monitor_internal_token or x_monitor_token != settings.monitor_internal_token:
+        raise HTTPException(status_code=401, detail="Invalid monitor token")
+
+    segment = "shopify-5k-25k"
+    processed = 0
+    analyses = 0
+
+    for connection in list_active_shopify_connections(limit=limit):
+        processed += 1
+        try:
+            orders = fetch_orders(
+                shop_domain=connection["shop_domain"],
+                access_token=connection["access_token"],
+                updated_at_min=connection.get("last_synced_at"),
+            )
+            if not orders:
+                save_monitor_run(
+                    user_id=connection["user_id"],
+                    shop_domain=connection["shop_domain"],
+                    segment=segment,
+                    status="no_data",
+                    detail={"message": "No new orders returned"},
+                )
+                continue
+
+            events = normalize_shopify_orders(orders)
+            content_hash = hashlib.sha256(json.dumps(orders, sort_keys=True).encode("utf-8")).hexdigest()
+            cached = find_analysis_by_hash(
+                content_hash=content_hash,
+                segment=segment,
+                user_id=connection["user_id"],
+            )
+            if cached:
+                mark_shopify_connection_synced(connection["user_id"])
+                save_monitor_run(
+                    user_id=connection["user_id"],
+                    shop_domain=connection["shop_domain"],
+                    segment=segment,
+                    status="cached",
+                    detail={"run_id": cached.get("run_id")},
+                )
+                continue
+
+            response = _run_analysis_from_events(
+                user_id=connection["user_id"],
+                segment=segment,
+                source_file=f"shopify:{connection['shop_domain']}",
+                events=events,
+                content_hash=content_hash,
+            )
+            mark_shopify_connection_synced(connection["user_id"])
+            save_monitor_run(
+                user_id=connection["user_id"],
+                shop_domain=connection["shop_domain"],
+                segment=segment,
+                status="ok",
+                detail={"run_id": response.run_id, "findings": len(response.findings)},
+            )
+            analyses += 1
+        except Exception as exc:
+            logger.exception("Shopify monitor failed for shop=%s", connection["shop_domain"])
+            save_monitor_run(
+                user_id=connection["user_id"],
+                shop_domain=connection["shop_domain"],
+                segment=segment,
+                status="error",
+                detail={"error": str(exc)},
+            )
+
+    return MonitorRunResponse(processed_stores=processed, triggered_analyses=analyses)

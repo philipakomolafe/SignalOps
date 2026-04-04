@@ -92,3 +92,24 @@ class LoginResponse(BaseModel):
 	token_type: str = "bearer"
 	user: AuthUser
 
+
+class ShopifyConnectStartRequest(BaseModel):
+	shop_domain: str = Field(min_length=5, max_length=255)
+
+
+class ShopifyConnectStartResponse(BaseModel):
+	auth_url: str
+	shop_domain: str
+
+
+class ShopifyConnectionStatusResponse(BaseModel):
+	connected: bool
+	shop_domain: Optional[str] = None
+	scope: Optional[str] = None
+	last_synced_at: Optional[str] = None
+
+
+class MonitorRunResponse(BaseModel):
+	processed_stores: int
+	triggered_analyses: int
+

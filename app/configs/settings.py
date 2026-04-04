@@ -14,6 +14,21 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("DATABASE_URL", "PERSISTENCE_DATABASE_URL"),
     )
+    app_public_base_url: str = "http://127.0.0.1:8000"
+    monitor_internal_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("MONITOR_INTERNAL_TOKEN"),
+    )
+    shopify_api_key: str = Field(default="", validation_alias=AliasChoices("SHOPIFY_API_KEY"))
+    shopify_api_secret: str = Field(default="", validation_alias=AliasChoices("SHOPIFY_API_SECRET"))
+    shopify_scopes: str = Field(
+        default="read_orders",
+        validation_alias=AliasChoices("SHOPIFY_SCOPES"),
+    )
+    shopify_state_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("SHOPIFY_STATE_SECRET"),
+    )
     
 
 

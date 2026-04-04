@@ -188,3 +188,68 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
     events.sort(key=lambda e: e.ordered_at)
     logger.info("CSV normalization completed successfully with %s events", len(events))
     return events
+
+
+def normalize_shopify_orders(
+    orders: List[Dict[str, object]],
+    default_currency: str = "USD",
+) -> List[NormalizedOrderEvent]:
+    """Normalize Shopify Admin API order objects into canonical events."""
+    events: List[NormalizedOrderEvent] = []
+
+    for order in orders:
+        order_id = str(order.get("id") or order.get("name") or "").strip()
+        if not order_id:
+            continue
+
+        customer_id = ""
+        customer_obj = order.get("customer")
+        if isinstance(customer_obj, dict):
+            raw_customer_id = customer_obj.get("id")
+            raw_customer_email = customer_obj.get("email")
+            if raw_customer_id is not None:
+                customer_id = str(raw_customer_id).strip()
+            elif raw_customer_email:
+                customer_id = str(raw_customer_email).strip().lower()
+
+        if not customer_id:
+            fallback_email = str(order.get("email") or "").strip().lower()
+            customer_id = fallback_email or f"guest:{order_id}"
+
+        ordered_at = _parse_datetime(str(order.get("created_at") or order.get("processed_at") or ""))
+
+        order_total = _parse_float(str(order.get("current_total_price") or order.get("total_price") or "0"), "order_total")
+
+        refunded_amount = 0.0
+        refunds_obj = order.get("refunds")
+        if isinstance(refunds_obj, list):
+            for refund in refunds_obj:
+                if not isinstance(refund, dict):
+                    continue
+                transactions = refund.get("transactions")
+                if isinstance(transactions, list):
+                    for transaction in transactions:
+                        if not isinstance(transaction, dict):
+                            continue
+                        refunded_amount += _parse_float(str(transaction.get("amount") or "0"), "refunded_amount")
+
+        currency = str(order.get("currency") or order.get("presentment_currency") or default_currency).strip().upper()
+        if not currency:
+            currency = default_currency
+
+        events.append(
+            NormalizedOrderEvent(
+                order_id=order_id,
+                customer_id=customer_id,
+                ordered_at=ordered_at,
+                order_total=order_total,
+                refunded_amount=refunded_amount,
+                currency=currency,
+            )
+        )
+
+    if not events:
+        raise CSVNormalizationError("No valid Shopify orders found")
+
+    events.sort(key=lambda e: e.ordered_at)
+    return events

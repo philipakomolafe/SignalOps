@@ -204,6 +204,51 @@ def init_storage() -> None:
                 ON user_sessions (user_id, session_id DESC)
                 """,
             )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS shopify_connections (
+                    connection_id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    user_id BIGINT NOT NULL UNIQUE,
+                    shop_domain TEXT NOT NULL UNIQUE,
+                    access_token TEXT NOT NULL,
+                    scope TEXT,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    last_synced_at TIMESTAMPTZ,
+                    uninstalled_at TIMESTAMPTZ
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_shopify_connections_status
+                ON shopify_connections (status, updated_at DESC)
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS monitor_runs (
+                    monitor_run_id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    user_id BIGINT,
+                    shop_domain TEXT,
+                    segment TEXT,
+                    status TEXT NOT NULL,
+                    detail_json TEXT
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_monitor_runs_created
+                ON monitor_runs (created_at DESC)
+                """,
+            )
             connection.commit()
             return
 
@@ -280,6 +325,51 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_user_sessions_user
             ON user_sessions (user_id, session_id DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS shopify_connections (
+                connection_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER NOT NULL UNIQUE,
+                shop_domain TEXT NOT NULL UNIQUE,
+                access_token TEXT NOT NULL,
+                scope TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                last_synced_at TEXT,
+                uninstalled_at TEXT
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_shopify_connections_status
+            ON shopify_connections (status, updated_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS monitor_runs (
+                monitor_run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                shop_domain TEXT,
+                segment TEXT,
+                status TEXT NOT NULL,
+                detail_json TEXT
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_monitor_runs_created
+            ON monitor_runs (created_at DESC)
             """,
         )
         connection.commit()
@@ -583,6 +673,176 @@ def revoke_session(token_hash: str) -> None:
             WHERE token_hash = ? AND revoked_at IS NULL
             """,
             (token_hash,),
+        )
+        connection.commit()
+
+
+def upsert_shopify_connection(
+    user_id: int,
+    shop_domain: str,
+    access_token: str,
+    scope: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create or update a Shopify store connection for a user."""
+    with _connect() as connection:
+        if _is_postgres():
+            row = _execute(
+                connection,
+                """
+                INSERT INTO shopify_connections (user_id, shop_domain, access_token, scope, status, updated_at, uninstalled_at)
+                VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    shop_domain = EXCLUDED.shop_domain,
+                    access_token = EXCLUDED.access_token,
+                    scope = EXCLUDED.scope,
+                    status = 'active',
+                    updated_at = CURRENT_TIMESTAMP,
+                    uninstalled_at = NULL
+                RETURNING user_id, shop_domain, scope, status, last_synced_at
+                """,
+                (user_id, shop_domain, access_token, scope),
+            ).fetchone()
+            connection.commit()
+        else:
+            _execute(
+                connection,
+                """
+                INSERT INTO shopify_connections (user_id, shop_domain, access_token, scope, status, updated_at, uninstalled_at)
+                VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
+                ON CONFLICT(user_id)
+                DO UPDATE SET
+                    shop_domain = excluded.shop_domain,
+                    access_token = excluded.access_token,
+                    scope = excluded.scope,
+                    status = 'active',
+                    updated_at = CURRENT_TIMESTAMP,
+                    uninstalled_at = NULL
+                """,
+                (user_id, shop_domain, access_token, scope),
+            )
+            row = _execute(
+                connection,
+                """
+                SELECT user_id, shop_domain, scope, status, last_synced_at
+                FROM shopify_connections
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+            connection.commit()
+
+    return {
+        "user_id": int(row["user_id"]),
+        "shop_domain": str(row["shop_domain"]),
+        "scope": str(row["scope"]) if row["scope"] else None,
+        "status": str(row["status"]),
+        "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,
+    }
+
+
+def get_shopify_connection_by_user(user_id: int) -> Optional[Dict[str, Any]]:
+    """Return Shopify connection for a user when present."""
+    with _connect() as connection:
+        row = _execute(
+            connection,
+            """
+            SELECT user_id, shop_domain, access_token, scope, status, last_synced_at
+            FROM shopify_connections
+            WHERE user_id = ? AND status = 'active'
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "user_id": int(row["user_id"]),
+        "shop_domain": str(row["shop_domain"]),
+        "access_token": str(row["access_token"]),
+        "scope": str(row["scope"]) if row["scope"] else None,
+        "status": str(row["status"]),
+        "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,
+    }
+
+
+def list_active_shopify_connections(limit: int = 100) -> List[Dict[str, Any]]:
+    """List active Shopify connections for scheduled monitoring."""
+    capped_limit = max(1, min(limit, 500))
+    with _connect() as connection:
+        rows = _execute(
+            connection,
+            """
+            SELECT user_id, shop_domain, access_token, scope, status, last_synced_at
+            FROM shopify_connections
+            WHERE status = 'active'
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        ).fetchall()
+
+    return [
+        {
+            "user_id": int(row["user_id"]),
+            "shop_domain": str(row["shop_domain"]),
+            "access_token": str(row["access_token"]),
+            "scope": str(row["scope"]) if row["scope"] else None,
+            "status": str(row["status"]),
+            "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,
+        }
+        for row in rows
+    ]
+
+
+def mark_shopify_connection_synced(user_id: int) -> None:
+    """Update sync marker after successful monitor run."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            UPDATE shopify_connections
+            SET last_synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND status = 'active'
+            """,
+            (user_id,),
+        )
+        connection.commit()
+
+
+def deactivate_shopify_connection(user_id: int) -> None:
+    """Deactivate Shopify integration for a user."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            UPDATE shopify_connections
+            SET status = 'inactive', updated_at = CURRENT_TIMESTAMP, uninstalled_at = CURRENT_TIMESTAMP
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        )
+        connection.commit()
+
+
+def save_monitor_run(
+    user_id: int,
+    shop_domain: str,
+    segment: str,
+    status: str,
+    detail: Dict[str, Any],
+) -> None:
+    """Persist monitor execution outcome for observability and support."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            INSERT INTO monitor_runs (user_id, shop_domain, segment, status, detail_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, shop_domain, segment, status, json.dumps(detail)),
         )
         connection.commit()
 
