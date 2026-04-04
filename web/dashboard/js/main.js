@@ -23,6 +23,8 @@ const runButton = form ? form.querySelector("button[type='submit']") : null;
 const userNameEl = document.getElementById("user-name");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
+const settingsToggleBtn = document.getElementById("settings-toggle-btn");
+const settingsStackEl = document.getElementById("settings-stack");
 const logoutBtn = document.getElementById("logout-btn");
 const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
@@ -340,7 +342,19 @@ if (userToggleBtn && userActionsEl) {
   userToggleBtn.addEventListener("click", () => {
     const isOpen = !userActionsEl.hidden;
     userActionsEl.hidden = isOpen;
+    if (isOpen && settingsStackEl) {
+      settingsStackEl.hidden = true;
+      if (settingsToggleBtn) settingsToggleBtn.textContent = "Settings";
+    }
     userToggleBtn.setAttribute("aria-expanded", String(!isOpen));
+  });
+}
+
+if (settingsToggleBtn && settingsStackEl) {
+  settingsToggleBtn.addEventListener("click", () => {
+    const willShow = settingsStackEl.hidden;
+    settingsStackEl.hidden = !willShow;
+    settingsToggleBtn.textContent = willShow ? "Hide Settings" : "Settings";
   });
 }
 

@@ -170,6 +170,22 @@
   gap: 6px;
 }
 
+#settings-toggle-btn {
+  width: 100%;
+  border: 1px solid #cfd8e3;
+  background: #fff;
+  color: #243044;
+  border-radius: 9px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#settings-toggle-btn:hover {
+  background: #f2f6fb;
+}
+
 .settings-stack {
   display: grid;
   gap: 6px;
@@ -530,6 +546,11 @@
   }
 
   #logout-btn {
+    font-size: 0.68rem;
+    padding: 0.35rem 0.3rem;
+  }
+
+  #settings-toggle-btn {
     font-size: 0.68rem;
     padding: 0.35rem 0.3rem;
   }
