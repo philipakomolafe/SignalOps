@@ -45,19 +45,37 @@
           <span id="user-name">User</span>
         </button>
         <div id="user-actions" class="user-actions" hidden>
-          <button id="settings-toggle-btn" type="button">Settings</button>
-          <section id="settings-stack" class="settings-stack" aria-label="Integration settings" hidden>
-            <h4>Settings</h4>
-            <label class="settings-label" for="shop-domain-input">Shopify store</label>
-            <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
-            <div class="settings-actions-row">
-              <button id="shopify-connect-btn" type="button">Connect</button>
-              <button id="shopify-disconnect-btn" type="button">Disconnect</button>
+          <div class="account-flyout">
+            <div class="account-header">
+              <span class="account-avatar account-avatar-large" aria-hidden="true"></span>
+              <div>
+                <strong id="user-card-name">User</strong>
+                <p id="user-card-email">user@example.com</p>
+              </div>
             </div>
-            <button id="shopify-sync-btn" type="button">Sync Now</button>
-            <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
-          </section>
-          <button id="logout-btn" type="button">Log out</button>
+
+            <div class="account-links" role="menu" aria-label="Dashboard account options">
+              <button class="account-link" type="button" data-account-action="upgrade">Upgrade plan</button>
+              <button class="account-link" type="button" data-account-action="personalization">Personalization</button>
+              <button class="account-link" type="button" data-account-action="profile">Profile</button>
+              <button class="account-link" type="button" data-account-action="settings">Settings</button>
+              <button class="account-link" type="button" data-account-action="help">Help</button>
+            </div>
+
+            <section class="settings-stack" aria-label="Integration settings">
+              <h4>Shopify</h4>
+              <label class="settings-label" for="shop-domain-input">Store domain</label>
+              <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
+              <div class="settings-actions-row">
+                <button id="shopify-connect-btn" type="button">Connect</button>
+                <button id="shopify-disconnect-btn" type="button">Disconnect</button>
+              </div>
+              <button id="shopify-sync-btn" type="button">Sync now</button>
+              <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
+            </section>
+
+            <button id="logout-btn" type="button" class="account-link logout-link">Log out</button>
+          </div>
         </div>
       </div>
     </aside>

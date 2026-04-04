@@ -21,16 +21,17 @@ const statusEl = document.getElementById("status");
 const historyListEl = document.getElementById("history-list");
 const runButton = form ? form.querySelector("button[type='submit']") : null;
 const userNameEl = document.getElementById("user-name");
+const userCardNameEl = document.getElementById("user-card-name");
+const userCardEmailEl = document.getElementById("user-card-email");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
-const settingsToggleBtn = document.getElementById("settings-toggle-btn");
-const settingsStackEl = document.getElementById("settings-stack");
 const logoutBtn = document.getElementById("logout-btn");
 const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
+const accountMenuButtons = document.querySelectorAll(".account-link[data-account-action]");
 let currentRunId = null;
 
 function runIdToConversationId(runId) {
@@ -108,6 +109,19 @@ function setShopifyButtonsDisabled(disabled) {
   [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn].forEach((button) => {
     if (button) button.disabled = disabled;
   });
+}
+
+function closeUserFlyout() {
+  if (!userActionsEl || !userToggleBtn) return;
+  userActionsEl.hidden = true;
+  userToggleBtn.setAttribute("aria-expanded", "false");
+}
+
+function toggleUserFlyout() {
+  if (!userActionsEl || !userToggleBtn) return;
+  const isOpen = !userActionsEl.hidden;
+  userActionsEl.hidden = isOpen;
+  userToggleBtn.setAttribute("aria-expanded", String(!isOpen));
 }
 
 async function loadShopifyStatus() {
@@ -338,25 +352,52 @@ if (shopifySyncBtn) {
   });
 }
 
-if (userToggleBtn && userActionsEl) {
-  userToggleBtn.addEventListener("click", () => {
-    const isOpen = !userActionsEl.hidden;
-    userActionsEl.hidden = isOpen;
-    if (isOpen && settingsStackEl) {
-      settingsStackEl.hidden = true;
-      if (settingsToggleBtn) settingsToggleBtn.textContent = "Settings";
+accountMenuButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const action = button.getAttribute("data-account-action");
+    switch (action) {
+      case "settings":
+        if (shopDomainInputEl) {
+          shopDomainInputEl.focus();
+        }
+        setShopifyStatus("Settings opened. Update your Shopify connection here.");
+        break;
+      case "profile":
+        setStatus("Profile view is available from the account flyout.");
+        break;
+      case "help":
+        setStatus("Help: connect Shopify, then use Sync Now to run monitoring.");
+        break;
+      case "upgrade":
+        setStatus("Upgrade plan is coming soon.");
+        break;
+      case "personalization":
+        setStatus("Personalization will be added to this account menu.");
+        break;
+      default:
+        break;
     }
-    userToggleBtn.setAttribute("aria-expanded", String(!isOpen));
   });
+});
+
+if (userToggleBtn && userActionsEl) {
+  userToggleBtn.addEventListener("click", toggleUserFlyout);
 }
 
-if (settingsToggleBtn && settingsStackEl) {
-  settingsToggleBtn.addEventListener("click", () => {
-    const willShow = settingsStackEl.hidden;
-    settingsStackEl.hidden = !willShow;
-    settingsToggleBtn.textContent = willShow ? "Hide Settings" : "Settings";
-  });
-}
+document.addEventListener("click", (event) => {
+  if (!userActionsEl || !userToggleBtn) return;
+  const target = event.target;
+  if (!(target instanceof Node)) return;
+  if (userActionsEl.hidden) return;
+  if (userToggleBtn.contains(target) || userActionsEl.contains(target)) return;
+  closeUserFlyout();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeUserFlyout();
+  }
+});
 
 async function bootstrap() {
   const token = requireAuthToken();
@@ -369,6 +410,13 @@ async function bootstrap() {
     if (userNameEl) {
       const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
       userNameEl.textContent = me.full_name || fallbackName;
+    }
+    if (userCardNameEl) {
+      const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
+      userCardNameEl.textContent = me.full_name || fallbackName;
+    }
+    if (userCardEmailEl) {
+      userCardEmailEl.textContent = typeof me.email === "string" ? me.email : "";
     }
     await loadHistory();
     await loadShopifyStatus();
