@@ -570,7 +570,7 @@ def get_user_by_session_hash(token_hash: str) -> Optional[Dict[str, Any]]:
         "company": str(row["company"]) if row["company"] else None,
     }
 
-
+# revoke token hash.
 def revoke_session(token_hash: str) -> None:
     """Mark active session as revoked for logout."""
     logger.info("Revoking session token hash")
@@ -585,3 +585,5 @@ def revoke_session(token_hash: str) -> None:
             (token_hash,),
         )
         connection.commit()
+
+
