@@ -21,8 +21,8 @@ const statusEl = document.getElementById("status");
 const historyListEl = document.getElementById("history-list");
 const runButton = form ? form.querySelector("button[type='submit']") : null;
 const userNameEl = document.getElementById("user-name");
-const userCardNameEl = document.getElementById("user-card-name");
-const userCardEmailEl = document.getElementById("user-card-email");
+const panelUserNameEl = document.getElementById("panel-user-name");
+const panelUserEmailEl = document.getElementById("panel-user-email");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
 const logoutBtn = document.getElementById("logout-btn");
@@ -31,7 +31,6 @@ const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
-const accountMenuButtons = document.querySelectorAll(".account-link[data-account-action]");
 let currentRunId = null;
 
 function runIdToConversationId(runId) {
@@ -111,13 +110,13 @@ function setShopifyButtonsDisabled(disabled) {
   });
 }
 
-function closeUserFlyout() {
+function closeUserPanel() {
   if (!userActionsEl || !userToggleBtn) return;
   userActionsEl.hidden = true;
   userToggleBtn.setAttribute("aria-expanded", "false");
 }
 
-function toggleUserFlyout() {
+function toggleUserPanel() {
   if (!userActionsEl || !userToggleBtn) return;
   const isOpen = !userActionsEl.hidden;
   userActionsEl.hidden = isOpen;
@@ -352,52 +351,24 @@ if (shopifySyncBtn) {
   });
 }
 
-accountMenuButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const action = button.getAttribute("data-account-action");
-    switch (action) {
-      case "settings":
-        if (shopDomainInputEl) {
-          shopDomainInputEl.focus();
-        }
-        setShopifyStatus("Settings opened. Update your Shopify connection here.");
-        break;
-      case "profile":
-        setStatus("Profile view is available from the account flyout.");
-        break;
-      case "help":
-        setStatus("Help: connect Shopify, then use Sync Now to run monitoring.");
-        break;
-      case "upgrade":
-        setStatus("Upgrade plan is coming soon.");
-        break;
-      case "personalization":
-        setStatus("Personalization will be added to this account menu.");
-        break;
-      default:
-        break;
-    }
-  });
-});
-
 if (userToggleBtn && userActionsEl) {
-  userToggleBtn.addEventListener("click", toggleUserFlyout);
+  userToggleBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleUserPanel();
+  });
+
+  userActionsEl.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  document.addEventListener("click", () => {
+    closeUserPanel();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeUserPanel();
+  });
 }
-
-document.addEventListener("click", (event) => {
-  if (!userActionsEl || !userToggleBtn) return;
-  const target = event.target;
-  if (!(target instanceof Node)) return;
-  if (userActionsEl.hidden) return;
-  if (userToggleBtn.contains(target) || userActionsEl.contains(target)) return;
-  closeUserFlyout();
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    closeUserFlyout();
-  }
-});
 
 async function bootstrap() {
   const token = requireAuthToken();
@@ -407,16 +378,18 @@ async function bootstrap() {
 
   try {
     const me = await fetchCurrentUser();
+    const email = typeof me.email === "string" ? me.email.trim() : "";
+    const fallbackName = email ? email.split("@")[0] : "User";
+    const resolvedName = me.full_name || fallbackName;
+
     if (userNameEl) {
-      const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
-      userNameEl.textContent = me.full_name || fallbackName;
+      userNameEl.textContent = resolvedName;
     }
-    if (userCardNameEl) {
-      const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
-      userCardNameEl.textContent = me.full_name || fallbackName;
+    if (panelUserNameEl) {
+      panelUserNameEl.textContent = resolvedName;
     }
-    if (userCardEmailEl) {
-      userCardEmailEl.textContent = typeof me.email === "string" ? me.email : "";
+    if (panelUserEmailEl) {
+      panelUserEmailEl.textContent = email || "No email found";
     }
     await loadHistory();
     await loadShopifyStatus();

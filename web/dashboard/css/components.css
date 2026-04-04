@@ -39,7 +39,6 @@
   background: #fbfcfe;
 }
 
-
 .menu-item.active {
   background: #eef3ff;
   border-color: #c7d5f7;
@@ -167,92 +166,67 @@
 }
 
 .user-actions {
+  display: grid;
+  gap: 6px;
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 10px);
-  z-index: 30;
-  display: grid;
-  gap: 10px;
+  left: -1px;
+  bottom: calc(100% + 8px);
+  width: min(292px, 82vw);
+  z-index: 40;
+  background: #ffffff;
+  border: 1px solid #d6deea;
+  border-radius: 14px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
   padding: 10px;
-  border: 1px solid #3b3b41;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #2b2b2f 0%, #232327 100%);
-  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.28);
-  color: #f3f4f6;
 }
 
-.account-flyout {
-  display: grid;
-  gap: 10px;
-}
-
-.account-header {
+.user-panel-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.account-avatar-large {
-  width: 1.65rem;
-  height: 1.65rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #5566ff 0%, #7b8aff 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.account-header strong {
-  display: block;
-  font-family: "Manrope", sans-serif;
-  font-size: 0.92rem;
-  line-height: 1.15;
-  color: #f9fafb;
-}
-
-.account-header p {
-  margin: 0.12rem 0 0;
-  font-size: 0.74rem;
-  color: #b7bec9;
-}
-
-.account-links {
-  display: grid;
-  gap: 4px;
-}
-
-.account-link {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #f3f4f6;
-  text-align: left;
+  gap: 8px;
+  padding: 8px;
   border-radius: 10px;
-  padding: 0.55rem 0.62rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
+  border: 1px solid #d5deea;
+  background: #f8fafc;
 }
 
-.account-link:hover {
-  background: rgba(255, 255, 255, 0.08);
+.user-panel-avatar {
+  width: 0.86rem;
+  height: 0.86rem;
+  border-radius: 999px;
+  background: #374151;
+  border: 1px solid #9ca3af;
+  flex: 0 0 auto;
 }
 
-.logout-link {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 0.7rem;
-  color: #ffb3b3;
+.user-panel-text {
+  display: grid;
+  min-width: 0;
+}
+
+#panel-user-name {
+  color: #1f2937;
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#panel-user-email {
+  color: #5f6d80;
+  font-size: 0.67rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .settings-stack {
   display: grid;
   gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 9px;
+  border: 1px solid #d6deea;
+  border-radius: 9px;
+  background: #ffffff;
+  padding: 7px;
 }
 
 .settings-stack h4 {
@@ -261,26 +235,26 @@
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #e5e7eb;
+  color: #334155;
 }
 
 .settings-label {
   font-size: 0.68rem;
-  color: #cbd5e1;
+  color: #4b5563;
 }
 
 .settings-input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid #cfd8e3;
   border-radius: 8px;
   padding: 0.36rem 0.45rem;
   font-size: 0.74rem;
-  color: #f8fafc;
-  background: rgba(15, 15, 18, 0.72);
+  color: #1f2937;
+  background: #ffffff;
 }
 
 .settings-input:focus {
-  outline: 2px solid rgba(127, 145, 255, 0.45);
+  outline: 2px solid #d8e4ff;
   outline-offset: 1px;
 }
 
@@ -294,9 +268,9 @@
 #shopify-disconnect-btn,
 #shopify-sync-btn {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
-  color: #f8fafc;
+  border: 1px solid #cfd8e3;
+  background: #fff;
+  color: #243044;
   border-radius: 8px;
   padding: 0.35rem 0.45rem;
   font-size: 0.72rem;
@@ -307,19 +281,23 @@
 #shopify-connect-btn:hover,
 #shopify-disconnect-btn:hover,
 #shopify-sync-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f2f6fb;
 }
 
 #shopify-sync-btn {
-  background: rgba(88, 118, 255, 0.18);
-  border-color: rgba(132, 153, 255, 0.3);
+  background: #eef4ff;
+  border-color: #c6d5f6;
 }
 
 .settings-note {
   margin: 0;
   font-size: 0.69rem;
-  color: #cbd5e1;
+  color: #526174;
   line-height: 1.35;
+}
+
+.settings-note.error {
+  color: #9a2626;
 }
 
 #logout-btn {
@@ -601,6 +579,11 @@
     gap: 0;
   }
 
+  .user-actions {
+    left: 0;
+    width: min(260px, calc(100vw - 28px));
+  }
+
   .user-avatar {
     width: 0.62rem;
     height: 0.62rem;
@@ -612,8 +595,7 @@
   }
 
   .settings-stack h4,
-  .settings-label,
-  .settings-note {
+  .settings-label {
     display: none;
   }
 
@@ -634,14 +616,6 @@
     padding: 0.32rem 0.28rem;
   }
 
-
-@media (max-width: 980px) {
-  .user-actions {
-    left: auto;
-    right: 0;
-    width: min(310px, 78vw);
-  }
-}
   .metrics-grid,
   .diagnosis-grid {
     grid-template-columns: 1fr;
