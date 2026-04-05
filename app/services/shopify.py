@@ -129,7 +129,7 @@ def fetch_orders(
         params["updated_at_min"] = updated_at_min
 
     query = urllib.parse.urlencode(params)
-    url = f"https://{shop_domain}/admin/api/2024-10/orders.json?{query}"
+    url = f"https://{shop_domain}/admin/api/2026-04/orders.json?{query}"
     request = urllib.request.Request(
         url=url,
         headers={
