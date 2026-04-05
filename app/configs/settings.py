@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         default="read_orders",
         validation_alias=AliasChoices("SHOPIFY_SCOPES"),
     )
+    shopify_api_version: str = Field(
+        default="2026-04",
+        validation_alias=AliasChoices("SHOPIFY_API_VERSION"),
+    )
     shopify_state_secret: str = Field(
         default="",
         validation_alias=AliasChoices("SHOPIFY_STATE_SECRET"),

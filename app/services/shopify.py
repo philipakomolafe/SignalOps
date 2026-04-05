@@ -14,6 +14,11 @@ from app.configs.settings import settings
 logger = logging.getLogger(__name__)
 
 
+def _shopify_api_version() -> str:
+    """Return configured Shopify Admin API version with safe fallback."""
+    return (settings.shopify_api_version or "2026-04").strip() or "2026-04"
+
+
 def _state_secret() -> str:
     return settings.shopify_state_secret or settings.shopify_api_secret
 
@@ -129,7 +134,7 @@ def fetch_orders(
         params["updated_at_min"] = updated_at_min
 
     query = urllib.parse.urlencode(params)
-    url = f"https://{shop_domain}/admin/api/2026-04/orders.json?{query}"
+    url = f"https://{shop_domain}/admin/api/{_shopify_api_version()}/orders.json?{query}"
     request = urllib.request.Request(
         url=url,
         headers={
