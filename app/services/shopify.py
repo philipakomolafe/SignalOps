@@ -4,6 +4,7 @@ import hmac
 import json
 import logging
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
@@ -143,8 +144,27 @@ def fetch_orders(
         },
         method="GET",
     )
-    with urllib.request.urlopen(request, timeout=60) as response:
-        body = response.read().decode("utf-8")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        error_body = ""
+        try:
+            if exc.fp is not None:
+                error_body = exc.fp.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = ""
+
+        logger.error(
+            "Shopify orders fetch failed for shop=%s status=%s reason=%s body=%s",
+            shop_domain,
+            exc.code,
+            exc.reason,
+            error_body[:1000],
+        )
+        raise RuntimeError(
+            f"Shopify API error {exc.code} while fetching orders: {error_body or exc.reason}"
+        ) from exc
 
     payload = json.loads(body)
     orders = payload.get("orders", [])

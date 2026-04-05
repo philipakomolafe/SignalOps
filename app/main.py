@@ -599,7 +599,8 @@ def run_shopify_monitor_now(current_user: dict = Depends(get_current_user)) -> M
             status="error",
             detail={"error": str(exc)},
         )
-        raise HTTPException(status_code=502, detail="Monitor run failed for connected store") from exc
+        detail = str(exc).strip() or "Monitor run failed for connected store"
+        raise HTTPException(status_code=502, detail=detail[:500]) from exc
 
     return MonitorRunResponse(processed_stores=1, triggered_analyses=1 if created else 0)
 
