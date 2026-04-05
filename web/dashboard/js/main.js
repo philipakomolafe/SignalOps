@@ -21,10 +21,9 @@ const statusEl = document.getElementById("status");
 const historyListEl = document.getElementById("history-list");
 const runButton = form ? form.querySelector("button[type='submit']") : null;
 const userNameEl = document.getElementById("user-name");
-const panelUserNameEl = document.getElementById("panel-user-name");
-const panelUserEmailEl = document.getElementById("panel-user-email");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
+const sidebarUserEl = document.querySelector(".sidebar-user");
 const logoutBtn = document.getElementById("logout-btn");
 const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
@@ -108,19 +107,6 @@ function setShopifyButtonsDisabled(disabled) {
   [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn].forEach((button) => {
     if (button) button.disabled = disabled;
   });
-}
-
-function closeUserPanel() {
-  if (!userActionsEl || !userToggleBtn) return;
-  userActionsEl.hidden = true;
-  userToggleBtn.setAttribute("aria-expanded", "false");
-}
-
-function toggleUserPanel() {
-  if (!userActionsEl || !userToggleBtn) return;
-  const isOpen = !userActionsEl.hidden;
-  userActionsEl.hidden = isOpen;
-  userToggleBtn.setAttribute("aria-expanded", String(!isOpen));
 }
 
 async function loadShopifyStatus() {
@@ -352,21 +338,22 @@ if (shopifySyncBtn) {
 }
 
 if (userToggleBtn && userActionsEl) {
+  userActionsEl.hidden = true;
+  userToggleBtn.setAttribute("aria-expanded", "false");
+
   userToggleBtn.addEventListener("click", (event) => {
     event.stopPropagation();
-    toggleUserPanel();
+    const isOpen = !userActionsEl.hidden;
+    userActionsEl.hidden = isOpen;
+    userToggleBtn.setAttribute("aria-expanded", String(!isOpen));
   });
 
-  userActionsEl.addEventListener("click", (event) => {
-    event.stopPropagation();
-  });
-
-  document.addEventListener("click", () => {
-    closeUserPanel();
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeUserPanel();
+  document.addEventListener("click", (event) => {
+    if (userActionsEl.hidden) return;
+    if (sidebarUserEl && !sidebarUserEl.contains(event.target)) {
+      userActionsEl.hidden = true;
+      userToggleBtn.setAttribute("aria-expanded", "false");
+    }
   });
 }
 
@@ -378,18 +365,9 @@ async function bootstrap() {
 
   try {
     const me = await fetchCurrentUser();
-    const email = typeof me.email === "string" ? me.email.trim() : "";
-    const fallbackName = email ? email.split("@")[0] : "User";
-    const resolvedName = me.full_name || fallbackName;
-
     if (userNameEl) {
-      userNameEl.textContent = resolvedName;
-    }
-    if (panelUserNameEl) {
-      panelUserNameEl.textContent = resolvedName;
-    }
-    if (panelUserEmailEl) {
-      panelUserEmailEl.textContent = email || "No email found";
+      const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
+      userNameEl.textContent = me.full_name || fallbackName;
     }
     await loadHistory();
     await loadShopifyStatus();

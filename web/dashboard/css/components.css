@@ -39,6 +39,7 @@
   background: #fbfcfe;
 }
 
+
 .menu-item.active {
   background: #eef3ff;
   border-color: #c7d5f7;
@@ -126,7 +127,6 @@
   padding: 7px;
   display: grid;
   gap: 6px;
-  position: relative;
 }
 
 .user-toggle {
@@ -168,56 +168,10 @@
 .user-actions {
   display: grid;
   gap: 6px;
-  position: absolute;
-  left: -1px;
-  bottom: calc(100% + 8px);
-  width: min(292px, 82vw);
-  z-index: 40;
-  background: #ffffff;
-  border: 1px solid #d6deea;
-  border-radius: 14px;
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
-  padding: 10px;
 }
 
-.user-panel-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 10px;
-  border: 1px solid #d5deea;
-  background: #f8fafc;
-}
-
-.user-panel-avatar {
-  width: 0.86rem;
-  height: 0.86rem;
-  border-radius: 999px;
-  background: #374151;
-  border: 1px solid #9ca3af;
-  flex: 0 0 auto;
-}
-
-.user-panel-text {
-  display: grid;
-  min-width: 0;
-}
-
-#panel-user-name {
-  color: #1f2937;
-  font-size: 0.76rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#panel-user-email {
-  color: #5f6d80;
-  font-size: 0.67rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.user-actions[hidden] {
+  display: none !important;
 }
 
 .settings-stack {
@@ -250,7 +204,6 @@
   padding: 0.36rem 0.45rem;
   font-size: 0.74rem;
   color: #1f2937;
-  background: #ffffff;
 }
 
 .settings-input:focus {
@@ -294,10 +247,6 @@
   font-size: 0.69rem;
   color: #526174;
   line-height: 1.35;
-}
-
-.settings-note.error {
-  color: #9a2626;
 }
 
 #logout-btn {
@@ -579,11 +528,6 @@
     gap: 0;
   }
 
-  .user-actions {
-    left: 0;
-    width: min(260px, calc(100vw - 28px));
-  }
-
   .user-avatar {
     width: 0.62rem;
     height: 0.62rem;
@@ -595,7 +539,8 @@
   }
 
   .settings-stack h4,
-  .settings-label {
+  .settings-label,
+  .settings-note {
     display: none;
   }
 
