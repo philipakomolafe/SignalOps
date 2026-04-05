@@ -847,3 +847,129 @@ def save_monitor_run(
         connection.commit()
 
 
+def run_data_retention() -> Dict[str, int]:
+    """Delete stale rows according to configured TTL values."""
+    analysis_days = max(1, int(settings.retention_analysis_runs_days))
+    monitor_days = max(1, int(settings.retention_monitor_runs_days))
+    revoked_session_days = max(1, int(settings.retention_revoked_sessions_days))
+    inactive_shopify_days = max(1, int(settings.retention_inactive_shopify_days))
+
+    with _connect() as connection:
+        if _is_postgres():
+            analysis_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM analysis_runs
+                    WHERE created_at < (CURRENT_TIMESTAMP - (?::int * INTERVAL '1 day'))
+                    """,
+                    (analysis_days,),
+                ).rowcount
+                or 0
+            )
+            monitor_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM monitor_runs
+                    WHERE created_at < (CURRENT_TIMESTAMP - (?::int * INTERVAL '1 day'))
+                    """,
+                    (monitor_days,),
+                ).rowcount
+                or 0
+            )
+            revoked_sessions_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM user_sessions
+                    WHERE revoked_at IS NOT NULL
+                      AND revoked_at < (CURRENT_TIMESTAMP - (?::int * INTERVAL '1 day'))
+                    """,
+                    (revoked_session_days,),
+                ).rowcount
+                or 0
+            )
+            inactive_connections_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM shopify_connections
+                    WHERE status = 'inactive'
+                      AND uninstalled_at IS NOT NULL
+                      AND uninstalled_at < (CURRENT_TIMESTAMP - (?::int * INTERVAL '1 day'))
+                    """,
+                    (inactive_shopify_days,),
+                ).rowcount
+                or 0
+            )
+            connection.commit()
+        else:
+            analysis_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM analysis_runs
+                    WHERE datetime(created_at) < datetime('now', ?)
+                    """,
+                    (f"-{analysis_days} days",),
+                ).rowcount
+                or 0
+            )
+            monitor_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM monitor_runs
+                    WHERE datetime(created_at) < datetime('now', ?)
+                    """,
+                    (f"-{monitor_days} days",),
+                ).rowcount
+                or 0
+            )
+            revoked_sessions_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM user_sessions
+                    WHERE revoked_at IS NOT NULL
+                      AND datetime(revoked_at) < datetime('now', ?)
+                    """,
+                    (f"-{revoked_session_days} days",),
+                ).rowcount
+                or 0
+            )
+            inactive_connections_deleted = int(
+                _execute(
+                    connection,
+                    """
+                    DELETE FROM shopify_connections
+                    WHERE status = 'inactive'
+                      AND uninstalled_at IS NOT NULL
+                      AND datetime(uninstalled_at) < datetime('now', ?)
+                    """,
+                    (f"-{inactive_shopify_days} days",),
+                ).rowcount
+                or 0
+            )
+            connection.commit()
+
+    total_deleted = analysis_deleted + monitor_deleted + revoked_sessions_deleted + inactive_connections_deleted
+    logger.info(
+        "Data retention cleanup completed total=%s analysis=%s monitor=%s sessions=%s inactive_shopify=%s",
+        total_deleted,
+        analysis_deleted,
+        monitor_deleted,
+        revoked_sessions_deleted,
+        inactive_connections_deleted,
+    )
+
+    return {
+        "total_deleted": total_deleted,
+        "analysis_runs_deleted": analysis_deleted,
+        "monitor_runs_deleted": monitor_deleted,
+        "revoked_sessions_deleted": revoked_sessions_deleted,
+        "inactive_connections_deleted": inactive_connections_deleted,
+    }
+
+

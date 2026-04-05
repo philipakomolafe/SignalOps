@@ -33,6 +33,22 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("SHOPIFY_STATE_SECRET"),
     )
+    retention_monitor_runs_days: int = Field(
+        default=30,
+        validation_alias=AliasChoices("RETENTION_MONITOR_RUNS_DAYS"),
+    )
+    retention_revoked_sessions_days: int = Field(
+        default=30,
+        validation_alias=AliasChoices("RETENTION_REVOKED_SESSIONS_DAYS"),
+    )
+    retention_inactive_shopify_days: int = Field(
+        default=90,
+        validation_alias=AliasChoices("RETENTION_INACTIVE_SHOPIFY_DAYS"),
+    )
+    retention_analysis_runs_days: int = Field(
+        default=180,
+        validation_alias=AliasChoices("RETENTION_ANALYSIS_RUNS_DAYS"),
+    )
     
 
 

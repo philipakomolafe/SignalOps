@@ -113,3 +113,11 @@ class MonitorRunResponse(BaseModel):
 	processed_stores: int
 	triggered_analyses: int
 
+
+class DataRetentionRunResponse(BaseModel):
+	total_deleted: int
+	analysis_runs_deleted: int
+	monitor_runs_deleted: int
+	revoked_sessions_deleted: int
+	inactive_connections_deleted: int
+

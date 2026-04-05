@@ -130,6 +130,20 @@ It also supports chat-style entry URLs:
 - Dashboard access requires authentication.
 - Frontend assets are served from `/assets` (for example, `/assets/logo.png`).
 
+## Scheduled Jobs (Without Render Cron)
+
+SignalOps includes a GitHub Actions workflow at `.github/workflows/signalops-cron.yml` that can trigger both scheduled backend jobs:
+
+- `POST /api/v1/monitor/run/shopify` every 30 minutes
+- `POST /api/v1/maintenance/data-retention/run` once daily
+
+Configure these repository secrets in GitHub:
+
+- `SIGNALOPS_BASE_URL` (example: `https://your-service.onrender.com`)
+- `SIGNALOPS_MONITOR_TOKEN` (same value as `MONITOR_INTERNAL_TOKEN`)
+
+The workflow also supports manual runs via `workflow_dispatch`.
+
 ---
 
 Built as an operator-first MVP for detecting silent revenue leaks before they become visible losses.

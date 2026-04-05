@@ -23,6 +23,7 @@ from app.models.schemas import (
     AuthUser,
     AnalysisHistoryItem,
     AnalysisResponse,
+    DataRetentionRunResponse,
     LoginRequest,
     LoginResponse,
     MonitorRunResponse,
@@ -62,6 +63,7 @@ from app.services.persistence import (
     list_active_shopify_connections,
     mark_shopify_connection_synced,
     revoke_session,
+    run_data_retention,
     save_monitor_run,
     save_analysis,
     upsert_shopify_connection,
@@ -635,3 +637,18 @@ def run_shopify_monitor(
             )
 
     return MonitorRunResponse(processed_stores=processed, triggered_analyses=analyses)
+
+
+@app.post("/api/v1/maintenance/data-retention/run", response_model=DataRetentionRunResponse)
+def run_data_retention_cleanup(x_monitor_token: str | None = Header(default=None)) -> DataRetentionRunResponse:
+    """Run data retention cleanup pass over persisted records."""
+    if not settings.monitor_internal_token or x_monitor_token != settings.monitor_internal_token:
+        raise HTTPException(status_code=401, detail="Invalid monitor token")
+
+    try:
+        result = run_data_retention()
+    except Exception:
+        logger.exception("Data retention cleanup failed")
+        raise HTTPException(status_code=500, detail="Data retention cleanup failed")
+
+    return DataRetentionRunResponse(**result)

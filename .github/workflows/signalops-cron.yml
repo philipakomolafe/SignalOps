@@ -1,0 +1,61 @@
+name: SignalOps Scheduled Jobs
+
+on:
+  schedule:
+    # Monitor active Shopify connections every 30 minutes.
+    - cron: "*/30 * * * *"
+    # Run retention cleanup once daily at 03:17 UTC.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      run_monitor:
+        description: "Run monitor job"
+        required: false
+        type: boolean
+        default: true
+      run_retention:
+        description: "Run retention cleanup job"
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  scheduled-api-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate required secrets
+        env:
+          SIGNALOPS_BASE_URL: ${{ secrets['SIGNALOPS_BASE_URL'] }}
+          SIGNALOPS_MONITOR_TOKEN: ${{ secrets['SIGNALOPS_MONITOR_TOKEN'] }}
+        run: |
+          if [ -z "$SIGNALOPS_BASE_URL" ]; then
+            echo "Missing required secret: SIGNALOPS_BASE_URL"
+            exit 1
+          fi
+          if [ -z "$SIGNALOPS_MONITOR_TOKEN" ]; then
+            echo "Missing required secret: SIGNALOPS_MONITOR_TOKEN"
+            exit 1
+          fi
+
+      - name: Run Shopify monitor endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_monitor || github.event_name == 'schedule' && github.event.schedule == '*/30 * * * *' }}
+        env:
+          SIGNALOPS_BASE_URL: ${{ secrets['SIGNALOPS_BASE_URL'] }}
+          SIGNALOPS_MONITOR_TOKEN: ${{ secrets['SIGNALOPS_MONITOR_TOKEN'] }}
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${SIGNALOPS_BASE_URL%/}/api/v1/monitor/run/shopify" \
+            -H "x-monitor-token: ${SIGNALOPS_MONITOR_TOKEN}" \
+            -H "Content-Type: application/json"
+
+      - name: Run data retention cleanup endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_retention || github.event_name == 'schedule' && github.event.schedule == '17 3 * * *' }}
+        env:
+          SIGNALOPS_BASE_URL: ${{ secrets['SIGNALOPS_BASE_URL'] }}
+          SIGNALOPS_MONITOR_TOKEN: ${{ secrets['SIGNALOPS_MONITOR_TOKEN'] }}
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${SIGNALOPS_BASE_URL%/}/api/v1/maintenance/data-retention/run" \
+            -H "x-monitor-token: ${SIGNALOPS_MONITOR_TOKEN}" \
+            -H "Content-Type: application/json"
