@@ -129,6 +129,7 @@ It also supports chat-style entry URLs:
 
 - Dashboard access requires authentication.
 - Frontend assets are served from `/assets` (for example, `/assets/logo.png`).
+- Shopify now enforces expiring offline tokens. If a store was connected before this update, disconnect and reconnect once so refresh credentials are stored.
 
 ## Scheduled Jobs (Without Render Cron)
 

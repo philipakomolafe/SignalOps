@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("SHOPIFY_STATE_SECRET"),
     )
+    shopify_token_refresh_leeway_seconds: int = Field(
+        default=300,
+        validation_alias=AliasChoices("SHOPIFY_TOKEN_REFRESH_LEEWAY_SECONDS"),
+    )
     retention_monitor_runs_days: int = Field(
         default=30,
         validation_alias=AliasChoices("RETENTION_MONITOR_RUNS_DAYS"),

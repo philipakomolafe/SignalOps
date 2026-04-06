@@ -214,6 +214,8 @@ def init_storage() -> None:
                     user_id BIGINT NOT NULL UNIQUE,
                     shop_domain TEXT NOT NULL UNIQUE,
                     access_token TEXT NOT NULL,
+                    refresh_token TEXT,
+                    access_token_expires_at TIMESTAMPTZ,
                     scope TEXT,
                     status TEXT NOT NULL DEFAULT 'active',
                     last_synced_at TIMESTAMPTZ,
@@ -221,6 +223,21 @@ def init_storage() -> None:
                 )
                 """,
             )
+            shopify_columns = {
+                str(row["column_name"])
+                for row in _execute(
+                    connection,
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'shopify_connections'
+                    """,
+                ).fetchall()
+            }
+            if "refresh_token" not in shopify_columns:
+                _execute(connection, "ALTER TABLE shopify_connections ADD COLUMN refresh_token TEXT")
+            if "access_token_expires_at" not in shopify_columns:
+                _execute(connection, "ALTER TABLE shopify_connections ADD COLUMN access_token_expires_at TIMESTAMPTZ")
             _execute(
                 connection,
                 """
@@ -337,6 +354,8 @@ def init_storage() -> None:
                 user_id INTEGER NOT NULL UNIQUE,
                 shop_domain TEXT NOT NULL UNIQUE,
                 access_token TEXT NOT NULL,
+                refresh_token TEXT,
+                access_token_expires_at TEXT,
                 scope TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 last_synced_at TEXT,
@@ -344,6 +363,14 @@ def init_storage() -> None:
             )
             """,
         )
+        shopify_columns = {
+            row["name"]
+            for row in _execute(connection, "PRAGMA table_info(shopify_connections)").fetchall()
+        }
+        if "refresh_token" not in shopify_columns:
+            _execute(connection, "ALTER TABLE shopify_connections ADD COLUMN refresh_token TEXT")
+        if "access_token_expires_at" not in shopify_columns:
+            _execute(connection, "ALTER TABLE shopify_connections ADD COLUMN access_token_expires_at TEXT")
         _execute(
             connection,
             """
@@ -681,6 +708,8 @@ def upsert_shopify_connection(
     user_id: int,
     shop_domain: str,
     access_token: str,
+    refresh_token: Optional[str] = None,
+    access_token_expires_at: Optional[str] = None,
     scope: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create or update a Shopify store connection for a user."""
@@ -689,42 +718,46 @@ def upsert_shopify_connection(
             row = _execute(
                 connection,
                 """
-                INSERT INTO shopify_connections (user_id, shop_domain, access_token, scope, status, updated_at, uninstalled_at)
-                VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
+                INSERT INTO shopify_connections (user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope, status, updated_at, uninstalled_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
                 ON CONFLICT (user_id)
                 DO UPDATE SET
                     shop_domain = EXCLUDED.shop_domain,
                     access_token = EXCLUDED.access_token,
+                    refresh_token = EXCLUDED.refresh_token,
+                    access_token_expires_at = EXCLUDED.access_token_expires_at,
                     scope = EXCLUDED.scope,
                     status = 'active',
                     updated_at = CURRENT_TIMESTAMP,
                     uninstalled_at = NULL
-                RETURNING user_id, shop_domain, scope, status, last_synced_at
+                RETURNING user_id, shop_domain, scope, status, last_synced_at, access_token_expires_at
                 """,
-                (user_id, shop_domain, access_token, scope),
+                (user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope),
             ).fetchone()
             connection.commit()
         else:
             _execute(
                 connection,
                 """
-                INSERT INTO shopify_connections (user_id, shop_domain, access_token, scope, status, updated_at, uninstalled_at)
-                VALUES (?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
+                INSERT INTO shopify_connections (user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope, status, updated_at, uninstalled_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, NULL)
                 ON CONFLICT(user_id)
                 DO UPDATE SET
                     shop_domain = excluded.shop_domain,
                     access_token = excluded.access_token,
+                    refresh_token = excluded.refresh_token,
+                    access_token_expires_at = excluded.access_token_expires_at,
                     scope = excluded.scope,
                     status = 'active',
                     updated_at = CURRENT_TIMESTAMP,
                     uninstalled_at = NULL
                 """,
-                (user_id, shop_domain, access_token, scope),
+                (user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope),
             )
             row = _execute(
                 connection,
                 """
-                SELECT user_id, shop_domain, scope, status, last_synced_at
+                SELECT user_id, shop_domain, scope, status, last_synced_at, access_token_expires_at
                 FROM shopify_connections
                 WHERE user_id = ?
                 """,
@@ -738,7 +771,31 @@ def upsert_shopify_connection(
         "scope": str(row["scope"]) if row["scope"] else None,
         "status": str(row["status"]),
         "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,
+        "access_token_expires_at": str(row["access_token_expires_at"]) if row["access_token_expires_at"] else None,
     }
+
+
+def update_shopify_connection_tokens(
+    user_id: int,
+    access_token: str,
+    refresh_token: Optional[str],
+    access_token_expires_at: Optional[str],
+) -> None:
+    """Persist refreshed Shopify token credentials for a user."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            UPDATE shopify_connections
+            SET access_token = ?,
+                refresh_token = ?,
+                access_token_expires_at = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND status = 'active'
+            """,
+            (access_token, refresh_token, access_token_expires_at, user_id),
+        )
+        connection.commit()
 
 
 def get_shopify_connection_by_user(user_id: int) -> Optional[Dict[str, Any]]:
@@ -747,7 +804,7 @@ def get_shopify_connection_by_user(user_id: int) -> Optional[Dict[str, Any]]:
         row = _execute(
             connection,
             """
-            SELECT user_id, shop_domain, access_token, scope, status, last_synced_at
+            SELECT user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope, status, last_synced_at
             FROM shopify_connections
             WHERE user_id = ? AND status = 'active'
             LIMIT 1
@@ -762,6 +819,8 @@ def get_shopify_connection_by_user(user_id: int) -> Optional[Dict[str, Any]]:
         "user_id": int(row["user_id"]),
         "shop_domain": str(row["shop_domain"]),
         "access_token": str(row["access_token"]),
+        "refresh_token": str(row["refresh_token"]) if row["refresh_token"] else None,
+        "access_token_expires_at": str(row["access_token_expires_at"]) if row["access_token_expires_at"] else None,
         "scope": str(row["scope"]) if row["scope"] else None,
         "status": str(row["status"]),
         "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,
@@ -775,7 +834,7 @@ def list_active_shopify_connections(limit: int = 100) -> List[Dict[str, Any]]:
         rows = _execute(
             connection,
             """
-            SELECT user_id, shop_domain, access_token, scope, status, last_synced_at
+            SELECT user_id, shop_domain, access_token, refresh_token, access_token_expires_at, scope, status, last_synced_at
             FROM shopify_connections
             WHERE status = 'active'
             ORDER BY updated_at DESC
@@ -789,6 +848,8 @@ def list_active_shopify_connections(limit: int = 100) -> List[Dict[str, Any]]:
             "user_id": int(row["user_id"]),
             "shop_domain": str(row["shop_domain"]),
             "access_token": str(row["access_token"]),
+            "refresh_token": str(row["refresh_token"]) if row["refresh_token"] else None,
+            "access_token_expires_at": str(row["access_token_expires_at"]) if row["access_token_expires_at"] else None,
             "scope": str(row["scope"]) if row["scope"] else None,
             "status": str(row["status"]),
             "last_synced_at": str(row["last_synced_at"]) if row["last_synced_at"] else None,

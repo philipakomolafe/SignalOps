@@ -106,6 +106,22 @@ def exchange_code_for_token(shop_domain: str, code: str) -> Dict[str, Any]:
         "client_secret": settings.shopify_api_secret,
         "code": code,
     }
+    return _post_oauth_access_token(shop_domain, payload)
+
+
+def refresh_offline_access_token(shop_domain: str, refresh_token: str) -> Dict[str, Any]:
+    """Refresh Shopify offline access token using refresh_token grant."""
+    payload = {
+        "client_id": settings.shopify_api_key,
+        "client_secret": settings.shopify_api_secret,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    return _post_oauth_access_token(shop_domain, payload)
+
+
+def _post_oauth_access_token(shop_domain: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Call Shopify OAuth access token endpoint with consistent error handling."""
     url = f"https://{shop_domain}/admin/oauth/access_token"
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
@@ -114,8 +130,20 @@ def exchange_code_for_token(shop_domain: str, code: str) -> Dict[str, Any]:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        body = response.read().decode("utf-8")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        error_body = ""
+        try:
+            if exc.fp is not None:
+                error_body = exc.fp.read().decode("utf-8", errors="replace")
+        except Exception:
+            error_body = ""
+        raise RuntimeError(
+            f"Shopify token request failed {exc.code}: {error_body or exc.reason}"
+        ) from exc
+
     return json.loads(body)
 
 

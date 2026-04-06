@@ -5,6 +5,7 @@ import logging
 import os
 import secrets
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
@@ -66,6 +67,7 @@ from app.services.persistence import (
     run_data_retention,
     save_monitor_run,
     save_analysis,
+    update_shopify_connection_tokens,
     upsert_shopify_connection,
 )
 # Report builder that converts findings into summary + diagnosis text.
@@ -77,6 +79,7 @@ from app.services.shopify import (
     fetch_orders,
     normalize_shop_domain,
     parse_oauth_state,
+    refresh_offline_access_token,
     verify_callback_hmac,
     verify_webhook_hmac,
 )
@@ -357,14 +360,101 @@ def _run_analysis_from_events(
     return response
 
 
+def _compute_access_token_expires_at(token_payload: dict) -> str | None:
+    """Return ISO UTC expiry timestamp from Shopify token payload when available."""
+    expires_in_raw = token_payload.get("expires_in")
+    if expires_in_raw is None:
+        return None
+
+    try:
+        expires_in_seconds = int(expires_in_raw)
+    except (TypeError, ValueError):
+        return None
+
+    if expires_in_seconds <= 0:
+        return None
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
+    return expires_at.isoformat()
+
+
+def _coerce_utc_datetime(value: object) -> datetime | None:
+    """Parse DB/API timestamp value into UTC-aware datetime when possible."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _needs_token_refresh(connection: dict) -> bool:
+    """Decide whether Shopify access token should be refreshed before API calls."""
+    refresh_token = str(connection.get("refresh_token") or "").strip()
+    expires_at = _coerce_utc_datetime(connection.get("access_token_expires_at"))
+
+    # Legacy connections without refresh metadata must be re-authenticated.
+    if not refresh_token and not expires_at:
+        return True
+
+    # If refresh token exists but expiry is missing, refresh proactively.
+    if refresh_token and not expires_at:
+        return True
+
+    if not expires_at:
+        return False
+
+    leeway = max(0, int(settings.shopify_token_refresh_leeway_seconds))
+    return datetime.now(timezone.utc) + timedelta(seconds=leeway) >= expires_at
+
+
 def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
     """Run one monitor cycle for a single Shopify connection.
 
     Returns True when a fresh analysis is persisted, else False.
     """
+    access_token = str(connection.get("access_token") or "").strip()
+    if not access_token:
+        raise RuntimeError("Missing Shopify access token. Reconnect your store.")
+
+    if _needs_token_refresh(connection):
+        refresh_token = str(connection.get("refresh_token") or "").strip()
+        if not refresh_token:
+            raise RuntimeError(
+                "Shopify now requires expiring offline tokens. Reconnect your store to refresh credentials."
+            )
+
+        refreshed = refresh_offline_access_token(connection["shop_domain"], refresh_token)
+        new_access_token = str(refreshed.get("access_token") or "").strip()
+        if not new_access_token:
+            raise RuntimeError("Shopify token refresh failed: missing access_token")
+
+        new_refresh_token = str(refreshed.get("refresh_token") or "").strip() or refresh_token
+        new_expires_at = _compute_access_token_expires_at(refreshed)
+
+        update_shopify_connection_tokens(
+            user_id=connection["user_id"],
+            access_token=new_access_token,
+            refresh_token=new_refresh_token,
+            access_token_expires_at=new_expires_at,
+        )
+        connection["access_token"] = new_access_token
+        connection["refresh_token"] = new_refresh_token
+        connection["access_token_expires_at"] = new_expires_at
+        access_token = new_access_token
+
     orders = fetch_orders(
         shop_domain=connection["shop_domain"],
-        access_token=connection["access_token"],
+        access_token=access_token,
         updated_at_min=connection.get("last_synced_at"),
     )
     if not orders:
@@ -535,6 +625,8 @@ def shopify_connect_callback(request: Request):
 
     token_payload = exchange_code_for_token(normalized_shop, code)
     access_token = str(token_payload.get("access_token") or "").strip()
+    refresh_token = str(token_payload.get("refresh_token") or "").strip() or None
+    access_token_expires_at = _compute_access_token_expires_at(token_payload)
     scope = str(token_payload.get("scope") or "").strip() or None
     if not access_token:
         raise HTTPException(status_code=502, detail="Shopify token exchange failed")
@@ -543,6 +635,8 @@ def shopify_connect_callback(request: Request):
         user_id=state_user_id,
         shop_domain=normalized_shop,
         access_token=access_token,
+        refresh_token=refresh_token,
+        access_token_expires_at=access_token_expires_at,
         scope=scope,
     )
 
