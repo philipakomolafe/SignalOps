@@ -173,6 +173,8 @@ if WEB_ROOT.exists():
     app.mount("/signup", StaticFiles(directory=WEB_ROOT / "signup", html=True), name="signup")
     # Landing page variant 1.
     app.mount("/v1", StaticFiles(directory=WEB_ROOT / "v1", html=True), name="v1")
+    # Placeholder buy page for checkout flow.
+    app.mount("/buy", StaticFiles(directory=WEB_ROOT / "buy", html=True), name="buy")
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> dict:
@@ -215,6 +217,24 @@ def root() -> RedirectResponse:
     """Default entrypoint redirects to primary landing page."""
     # Keep root URL short and human-friendly.
     return RedirectResponse(url="/v1/")
+
+
+@app.get("/buy")
+def buy_entry() -> RedirectResponse:
+    """Canonical entrypoint for buy page."""
+    return RedirectResponse(url="/buy/")
+
+
+@app.get("/api/v1/buy")
+def buy_status(plan: str | None = Query(default=None)) -> dict:
+    """Placeholder endpoint for upcoming payment integration."""
+    safe_plan = (plan or "").strip().lower() or None
+    return {
+        "status": "ready",
+        "message": "Payment page is prepared. Checkout integration will be enabled once payment details are provided.",
+        "plan": safe_plan,
+        "checkout_enabled": False,
+    }
 
 
 @app.get("/c/{conversation_id}")

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalOPs | Buy</title>
+  <meta name="description" content="SignalOPs checkout preparation page." />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <style>
+    :root {
+      --bg: #f3f3f3;
+      --ink: #111111;
+      --muted: #555555;
+      --line: #d5d5d5;
+      --card: #efefef;
+      --radius: 18px;
+      --shadow: 0 14px 30px rgba(0, 0, 0, 0.07);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Manrope", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 15%, rgba(0, 0, 0, 0.06), transparent 32%),
+        radial-gradient(circle at 80% 25%, rgba(0, 0, 0, 0.05), transparent 34%),
+        linear-gradient(180deg, #f9f9f9 0%, #efefef 50%, #e8e8e8 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      background: var(--card);
+      padding: clamp(20px, 3vw, 34px);
+    }
+
+    .kicker {
+      display: inline-block;
+      border: 1px solid #b8b8b8;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      letter-spacing: 0.2px;
+      padding: 5px 12px;
+      margin-bottom: 0.8rem;
+    }
+
+    h1 {
+      margin: 0;
+      line-height: 1.05;
+      font-size: clamp(1.9rem, 5vw, 3rem);
+      font-family: "Georgia", serif;
+    }
+
+    p {
+      color: #2f2f2f;
+      line-height: 1.55;
+      margin-top: 0.7rem;
+      margin-bottom: 0;
+    }
+
+    .panel {
+      margin-top: 1.2rem;
+      padding: 14px;
+      border-radius: 12px;
+      background: #f8f8f8;
+      border: 1px solid #dddddd;
+    }
+
+    .meta {
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    .actions {
+      margin-top: 1.4rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      text-decoration: none;
+      color: #ffffff;
+      background: var(--ink);
+      border: 1px solid var(--ink);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 0.92rem;
+    }
+
+    .btn.ghost {
+      color: var(--ink);
+      background: transparent;
+    }
+
+    .status {
+      margin-top: 0.9rem;
+      font-size: 0.9rem;
+      color: #3f3f3f;
+      min-height: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="kicker">SignalOPs Purchase Flow</div>
+    <h1>Checkout page is ready</h1>
+    <p>
+      This buy route is now prepared and can receive plan selections from the landing page.
+      Payment processing is intentionally disabled until you provide full payment details.
+    </p>
+
+    <section class="panel">
+      <strong id="planLabel">Selected plan: Starter</strong>
+      <div class="meta" id="planMeta">Plan key: starter</div>
+    </section>
+
+    <div class="actions">
+      <a class="btn ghost" href="/v1/#pricing">Back to pricing</a>
+      <a class="btn" href="/login/#register">Create account first</a>
+    </div>
+
+    <p class="status" id="statusText">Checking buy API readiness...</p>
+  </main>
+
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var plan = (params.get("plan") || "starter").trim().toLowerCase();
+      var labelMap = {
+        free: "Free",
+        starter: "Starter ($29/mo)",
+        pro: "Pro ($99/mo)"
+      };
+
+      var planLabel = document.getElementById("planLabel");
+      var planMeta = document.getElementById("planMeta");
+      var statusText = document.getElementById("statusText");
+
+      if (planLabel) {
+        planLabel.textContent = "Selected plan: " + (labelMap[plan] || "Starter ($29/mo)");
+      }
+      if (planMeta) {
+        planMeta.textContent = "Plan key: " + (labelMap[plan] ? plan : "starter");
+      }
+
+      fetch("/api/v1/buy?plan=" + encodeURIComponent(plan), { method: "GET" })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("Buy API returned " + response.status);
+          }
+          return response.json();
+        })
+        .then(function (payload) {
+          var message = payload && payload.message ? payload.message : "Buy API is ready.";
+          if (statusText) {
+            statusText.textContent = message;
+          }
+        })
+        .catch(function () {
+          if (statusText) {
+            statusText.textContent = "Buy API is ready in backend; payment checkout will be enabled next.";
+          }
+        });
+    })();
+  </script>
+</body>
+</html>

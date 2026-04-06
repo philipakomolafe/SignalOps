@@ -226,6 +226,10 @@ h1 {
   font-size: 0.96rem;
 }
 
+.plan-actions {
+  margin-top: 1rem;
+}
+
 .band {
   font-family: "Space Grotesk", sans-serif;
   margin-top: 2.2rem;

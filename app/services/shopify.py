@@ -15,6 +15,56 @@ from app.configs.settings import settings
 logger = logging.getLogger(__name__)
 
 
+# Only keep scopes that do not require protected customer data approval.
+_NON_PROTECTED_SCOPES = {
+    "read_orders",
+    "read_all_orders",
+}
+
+# Ask Shopify for only operational order fields and strip customer PII from responses.
+_NON_PROTECTED_ORDER_FIELDS = (
+    "id",
+    "name",
+    "created_at",
+    "processed_at",
+    "updated_at",
+    "current_total_price",
+    "total_price",
+    "currency",
+    "presentment_currency",
+    "refunds",
+)
+
+
+def _safe_shopify_scopes() -> str:
+    """Return a comma-separated scope list constrained to non-protected scopes."""
+    configured = [part.strip() for part in (settings.shopify_scopes or "").split(",") if part.strip()]
+    if not configured:
+        return "read_orders"
+
+    safe = [scope for scope in configured if scope in _NON_PROTECTED_SCOPES]
+    if not safe:
+        logger.warning(
+            "Configured SHOPIFY_SCOPES contained no non-protected scopes; defaulting to read_orders"
+        )
+        return "read_orders"
+
+    dropped = [scope for scope in configured if scope not in _NON_PROTECTED_SCOPES]
+    if dropped:
+        logger.warning("Dropping protected or unsupported Shopify scopes: %s", ",".join(dropped))
+
+    return ",".join(safe)
+
+
+def _sanitize_non_protected_orders(orders: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return orders reduced to non-protected fields only."""
+    allowed = set(_NON_PROTECTED_ORDER_FIELDS)
+    sanitized: List[Dict[str, Any]] = []
+    for order in orders:
+        sanitized.append({key: value for key, value in order.items() if key in allowed})
+    return sanitized
+
+
 def _shopify_api_version() -> str:
     """Return configured Shopify Admin API version with safe fallback."""
     return (settings.shopify_api_version or "2026-04").strip() or "2026-04"
@@ -71,7 +121,7 @@ def build_install_url(shop_domain: str, state: str) -> str:
     callback_url = f"{settings.app_public_base_url.rstrip('/')}/api/v1/integrations/shopify/callback"
     params = {
         "client_id": settings.shopify_api_key,
-        "scope": settings.shopify_scopes,
+        "scope": _safe_shopify_scopes(),
         "redirect_uri": callback_url,
         "state": state,
     }
@@ -158,6 +208,7 @@ def fetch_orders(
         "status": "any",
         "limit": str(max(1, min(limit, 250))),
         "order": "updated_at asc",
+        "fields": ",".join(_NON_PROTECTED_ORDER_FIELDS),
     }
     if updated_at_min:
         params["updated_at_min"] = updated_at_min
@@ -198,7 +249,7 @@ def fetch_orders(
     orders = payload.get("orders", [])
     if not isinstance(orders, list):
         return []
-    return orders
+    return _sanitize_non_protected_orders(orders)
 
 
 def verify_webhook_hmac(body: bytes, header_hmac: Optional[str]) -> bool:
