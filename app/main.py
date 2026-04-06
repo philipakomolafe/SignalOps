@@ -419,16 +419,7 @@ def _coerce_utc_datetime(value: object) -> datetime | None:
 
 def _needs_token_refresh(connection: dict) -> bool:
     """Decide whether Shopify access token should be refreshed before API calls."""
-    refresh_token = str(connection.get("refresh_token") or "").strip()
     expires_at = _coerce_utc_datetime(connection.get("access_token_expires_at"))
-
-    # Legacy connections without refresh metadata must be re-authenticated.
-    if not refresh_token and not expires_at:
-        return True
-
-    # If refresh token exists but expiry is missing, refresh proactively.
-    if refresh_token and not expires_at:
-        return True
 
     if not expires_at:
         return False
@@ -443,11 +434,12 @@ def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
     Returns True when a fresh analysis is persisted, else False.
     """
     access_token = str(connection.get("access_token") or "").strip()
+    refresh_token = str(connection.get("refresh_token") or "").strip()
     if not access_token:
         raise RuntimeError("Missing Shopify access token. Reconnect your store.")
 
-    if _needs_token_refresh(connection):
-        refresh_token = str(connection.get("refresh_token") or "").strip()
+    # Refresh only when token has refresh metadata and expiry window indicates it is due.
+    if refresh_token and _needs_token_refresh(connection):
         if not refresh_token:
             raise RuntimeError(
                 "Shopify now requires expiring offline tokens. Reconnect your store to refresh credentials."
@@ -472,11 +464,21 @@ def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
         connection["access_token_expires_at"] = new_expires_at
         access_token = new_access_token
 
-    orders = fetch_orders(
-        shop_domain=connection["shop_domain"],
-        access_token=access_token,
-        updated_at_min=connection.get("last_synced_at"),
-    )
+    try:
+        orders = fetch_orders(
+            shop_domain=connection["shop_domain"],
+            access_token=access_token,
+            updated_at_min=connection.get("last_synced_at"),
+        )
+    except RuntimeError as exc:
+        message = str(exc)
+        lowered = message.lower()
+        if "non-expiring access tokens" in lowered:
+            raise RuntimeError(
+                "Shopify returned a legacy non-expiring token. Enable expiring offline tokens for this app in Shopify Partner Dashboard, then disconnect and reconnect this store."
+            ) from exc
+        raise
+
     if not orders:
         save_monitor_run(
             user_id=connection["user_id"],
