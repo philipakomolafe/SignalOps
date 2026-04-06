@@ -155,6 +155,7 @@ def exchange_code_for_token(shop_domain: str, code: str) -> Dict[str, Any]:
         "client_id": settings.shopify_api_key,
         "client_secret": settings.shopify_api_secret,
         "code": code,
+        "expiring": "1",
     }
     return _post_oauth_access_token(shop_domain, payload)
 
@@ -170,14 +171,31 @@ def refresh_offline_access_token(shop_domain: str, refresh_token: str) -> Dict[s
     return _post_oauth_access_token(shop_domain, payload)
 
 
+def migrate_legacy_offline_access_token(shop_domain: str, access_token: str) -> Dict[str, Any]:
+    """Migrate non-expiring offline token to expiring offline token pair."""
+    payload = {
+        "client_id": settings.shopify_api_key,
+        "client_secret": settings.shopify_api_secret,
+        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+        "subject_token": access_token,
+        "subject_token_type": "urn:shopify:params:oauth:token-type:offline-access-token",
+        "requested_token_type": "urn:shopify:params:oauth:token-type:offline-access-token",
+        "expiring": "1",
+    }
+    return _post_oauth_access_token(shop_domain, payload)
+
+
 def _post_oauth_access_token(shop_domain: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Call Shopify OAuth access token endpoint with consistent error handling."""
     url = f"https://{shop_domain}/admin/oauth/access_token"
-    data = json.dumps(payload).encode("utf-8")
+    data = urllib.parse.urlencode(payload).encode("utf-8")
     request = urllib.request.Request(
         url=url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
         method="POST",
     )
     try:

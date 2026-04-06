@@ -77,6 +77,7 @@ from app.services.shopify import (
     build_oauth_state,
     exchange_code_for_token,
     fetch_orders,
+    migrate_legacy_offline_access_token,
     normalize_shop_domain,
     parse_oauth_state,
     refresh_offline_access_token,
@@ -440,11 +441,6 @@ def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
 
     # Refresh only when token has refresh metadata and expiry window indicates it is due.
     if refresh_token and _needs_token_refresh(connection):
-        if not refresh_token:
-            raise RuntimeError(
-                "Shopify now requires expiring offline tokens. Reconnect your store to refresh credentials."
-            )
-
         refreshed = refresh_offline_access_token(connection["shop_domain"], refresh_token)
         new_access_token = str(refreshed.get("access_token") or "").strip()
         if not new_access_token:
@@ -464,20 +460,47 @@ def _run_shopify_monitor_for_connection(connection: dict, segment: str) -> bool:
         connection["access_token_expires_at"] = new_expires_at
         access_token = new_access_token
 
-    try:
-        orders = fetch_orders(
+    def _fetch_orders_for_connection(token: str):
+        return fetch_orders(
             shop_domain=connection["shop_domain"],
-            access_token=access_token,
+            access_token=token,
             updated_at_min=connection.get("last_synced_at"),
         )
+
+    try:
+        orders = _fetch_orders_for_connection(access_token)
     except RuntimeError as exc:
         message = str(exc)
         lowered = message.lower()
-        if "non-expiring access tokens" in lowered:
+        if "non-expiring access tokens" in lowered and not refresh_token:
+            # One-time migration path for legacy non-expiring offline tokens.
+            migrated = migrate_legacy_offline_access_token(connection["shop_domain"], access_token)
+            migrated_access_token = str(migrated.get("access_token") or "").strip()
+            migrated_refresh_token = str(migrated.get("refresh_token") or "").strip()
+            migrated_expires_at = _compute_access_token_expires_at(migrated)
+            if not migrated_access_token or not migrated_refresh_token:
+                raise RuntimeError(
+                    "Shopify token migration failed. Ensure expiring offline tokens are enabled for this app, then reconnect the store."
+                ) from exc
+
+            update_shopify_connection_tokens(
+                user_id=connection["user_id"],
+                access_token=migrated_access_token,
+                refresh_token=migrated_refresh_token,
+                access_token_expires_at=migrated_expires_at,
+            )
+            connection["access_token"] = migrated_access_token
+            connection["refresh_token"] = migrated_refresh_token
+            connection["access_token_expires_at"] = migrated_expires_at
+            access_token = migrated_access_token
+            refresh_token = migrated_refresh_token
+            orders = _fetch_orders_for_connection(access_token)
+        elif "non-expiring access tokens" in lowered:
             raise RuntimeError(
                 "Shopify returned a legacy non-expiring token. Enable expiring offline tokens for this app in Shopify Partner Dashboard, then disconnect and reconnect this store."
             ) from exc
-        raise
+        else:
+            raise
 
     if not orders:
         save_monitor_run(
