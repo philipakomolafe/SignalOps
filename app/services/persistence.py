@@ -1,9 +1,11 @@
 # JSON serialization for persisted payload blobs.
 import json
+from collections import Counter
 # SQLite runtime + DB operations.
 import sqlite3
 # Path handling for local DB file location.
 from pathlib import Path
+from datetime import datetime, timezone
 # Type hints used in repository-like functions.
 from typing import Any, Dict, List, Optional
 
@@ -290,6 +292,25 @@ def init_storage() -> None:
             _execute(
                 connection,
                 """
+                CREATE TABLE IF NOT EXISTS analysis_timings (
+                    timing_id BIGSERIAL PRIMARY KEY,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    user_id BIGINT,
+                    source TEXT,
+                    duration_ms REAL NOT NULL
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_analysis_timings_created
+                ON analysis_timings (created_at DESC)
+                """,
+            )
+            _execute(
+                connection,
+                """
                 CREATE TABLE IF NOT EXISTS billing_subscriptions (
                     subscription_id BIGSERIAL PRIMARY KEY,
                     user_id BIGINT NOT NULL UNIQUE,
@@ -465,6 +486,25 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_payment_events_tx_ref
             ON payment_events (tx_ref, created_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS analysis_timings (
+                timing_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                source TEXT,
+                duration_ms REAL NOT NULL
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_analysis_timings_created
+            ON analysis_timings (created_at DESC)
             """,
         )
         _execute(
@@ -1162,6 +1202,20 @@ def save_payment_event(
         raise
 
 
+def save_analysis_timing(user_id: int, source: str, duration_ms: float) -> None:
+    """Persist analysis turnaround timing for trend reporting."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            INSERT INTO analysis_timings (user_id, source, duration_ms)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, source, float(duration_ms)),
+        )
+        connection.commit()
+
+
 def upsert_billing_subscription(
     user_id: int,
     provider: str,
@@ -1243,5 +1297,193 @@ def upsert_billing_subscription(
                 ),
             )
         connection.commit()
+
+
+def _window_filter_sql(column: str, days: int) -> tuple[str, tuple[Any, ...]]:
+    """Return backend-specific WHERE snippet + params for N-day lookback."""
+    safe_days = max(1, int(days))
+    if _is_postgres():
+        return f"{column} >= (CURRENT_TIMESTAMP - (?::int * INTERVAL '1 day'))", (safe_days,)
+    return f"datetime({column}) >= datetime('now', ?)", (f"-{safe_days} days",)
+
+
+def get_founder_post_pack_metrics(window_days: int = 7) -> Dict[str, Any]:
+    """Aggregate weekly founder-facing metrics for admin reporting."""
+    safe_days = max(1, int(window_days))
+    generated_at = datetime.now(timezone.utc).isoformat()
+
+    analysis_where, analysis_params = _window_filter_sql("created_at", safe_days)
+    monitor_where, monitor_params = _window_filter_sql("created_at", safe_days)
+    users_where, users_params = _window_filter_sql("created_at", safe_days)
+    payments_where, payments_params = _window_filter_sql("created_at", safe_days)
+    timings_where, timings_params = _window_filter_sql("created_at", safe_days)
+
+    with _connect() as connection:
+        analyses_7d_row = _execute(
+            connection,
+            f"SELECT COUNT(*) AS total FROM analysis_runs WHERE {analysis_where}",
+            analysis_params,
+        ).fetchone()
+        active_users_7d_row = _execute(
+            connection,
+            f"SELECT COUNT(DISTINCT user_id) AS total FROM analysis_runs WHERE {analysis_where}",
+            analysis_params,
+        ).fetchone()
+
+        latest_analysis_row = _execute(
+            connection,
+            """
+            SELECT run_id, created_at, payload_json
+            FROM analysis_runs
+            ORDER BY run_id DESC
+            LIMIT 1
+            """,
+        ).fetchone()
+
+        if _is_postgres():
+            turnaround_rows = _execute(
+                connection,
+                f"""
+                SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day, AVG(duration_ms) AS avg_duration_ms
+                FROM analysis_timings
+                WHERE {timings_where}
+                GROUP BY 1
+                ORDER BY 1 ASC
+                """,
+                timings_params,
+            ).fetchall()
+        else:
+            turnaround_rows = _execute(
+                connection,
+                f"""
+                SELECT date(created_at) AS day, AVG(duration_ms) AS avg_duration_ms
+                FROM analysis_timings
+                WHERE {timings_where}
+                GROUP BY date(created_at)
+                ORDER BY date(created_at) ASC
+                """,
+                timings_params,
+            ).fetchall()
+
+        monitor_total_row = _execute(
+            connection,
+            f"SELECT COUNT(*) AS total FROM monitor_runs WHERE {monitor_where}",
+            monitor_params,
+        ).fetchone()
+        monitor_status_rows = _execute(
+            connection,
+            f"SELECT status, COUNT(*) AS total FROM monitor_runs WHERE {monitor_where} GROUP BY status",
+            monitor_params,
+        ).fetchall()
+        monitor_error_rows = _execute(
+            connection,
+            f"SELECT detail_json FROM monitor_runs WHERE {monitor_where} AND status = 'error'",
+            monitor_params,
+        ).fetchall()
+
+        signups_row = _execute(
+            connection,
+            f"SELECT COUNT(*) AS total FROM users WHERE {users_where}",
+            users_params,
+        ).fetchone()
+        plans_rows = _execute(
+            connection,
+            """
+            SELECT plan_code, COUNT(*) AS total
+            FROM billing_subscriptions
+            WHERE provider_status = 'active'
+            GROUP BY plan_code
+            ORDER BY total DESC
+            """,
+        ).fetchall()
+        payment_success_row = _execute(
+            connection,
+            f"""
+            SELECT COUNT(*) AS total
+            FROM payment_events
+            WHERE {payments_where}
+              AND event_type = 'charge.completed'
+              AND lower(COALESCE(status, '')) IN ('success', 'successful', 'succeeded')
+            """,
+            payments_params,
+        ).fetchone()
+
+    features = {}
+    based_on_run_id = None
+    based_on_created_at = None
+    if latest_analysis_row:
+        based_on_run_id = int(latest_analysis_row["run_id"])
+        based_on_created_at = str(latest_analysis_row["created_at"])
+        try:
+            payload = json.loads(str(latest_analysis_row["payload_json"]))
+            features = payload.get("features") if isinstance(payload, dict) else {}
+        except Exception:
+            features = {}
+
+    status_map = {str(row["status"]): int(row["total"]) for row in monitor_status_rows}
+    monitor_total = int(monitor_total_row["total"] or 0) if monitor_total_row else 0
+    monitor_success = int(status_map.get("ok", 0) + status_map.get("cached", 0))
+    monitor_error = int(status_map.get("error", 0))
+    success_rate = round((monitor_success / monitor_total) * 100.0, 2) if monitor_total else 0.0
+
+    error_categories: Counter[str] = Counter()
+    for row in monitor_error_rows:
+        detail_text = ""
+        try:
+            parsed = json.loads(str(row["detail_json"] or "{}"))
+            detail_text = str(parsed.get("error") or "").strip()
+        except Exception:
+            detail_text = ""
+        if not detail_text:
+            detail_text = "unknown_error"
+        category = detail_text.split(":", 1)[0].strip().lower().replace(" ", "_")
+        error_categories[category or "unknown_error"] += 1
+
+    turnaround_trend = [
+        {
+            "day": str(row["day"]),
+            "avg_duration_ms": round(float(row["avg_duration_ms"] or 0.0), 2),
+        }
+        for row in turnaround_rows
+    ]
+
+    return {
+        "generated_at": generated_at,
+        "window_days": safe_days,
+        "product_impact": {
+            "total_revenue_analyzed": round(float(features.get("total_revenue") or 0.0), 2),
+            "repeat_rate": round(float(features.get("repeat_rate") or 0.0), 2),
+            "refund_rate": round(float(features.get("refund_rate") or 0.0), 2),
+            "week_over_week_revenue_change_pct": (
+                round(float(features.get("week_over_week_revenue_change_pct")), 2)
+                if features.get("week_over_week_revenue_change_pct") is not None
+                else None
+            ),
+            "based_on_run_id": based_on_run_id,
+            "based_on_created_at": based_on_created_at,
+        },
+        "usage_velocity": {
+            "analyses_run_7d": int(analyses_7d_row["total"] or 0) if analyses_7d_row else 0,
+            "active_users_7d": int(active_users_7d_row["total"] or 0) if active_users_7d_row else 0,
+            "csv_to_insight_turnaround_trend": turnaround_trend,
+        },
+        "monitoring_reliability": {
+            "monitor_runs_7d": monitor_total,
+            "success_rate_pct": success_rate,
+            "error_count_7d": monitor_error,
+            "top_error_category": error_categories.most_common(1)[0][0] if error_categories else None,
+        },
+        "commercial_traction": {
+            "new_signups_7d": int(signups_row["total"] or 0) if signups_row else 0,
+            "active_subscriptions_by_plan": [
+                {
+                    "plan_code": str(row["plan_code"]),
+                    "total": int(row["total"]),
+                }
+                for row in plans_rows
+            ],
+            "payment_success_events_7d": int(payment_success_row["total"] or 0) if payment_success_row else 0,
+        },
+    }
 
 

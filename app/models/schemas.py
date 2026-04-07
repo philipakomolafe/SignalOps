@@ -121,3 +121,50 @@ class DataRetentionRunResponse(BaseModel):
 	revoked_sessions_deleted: int
 	inactive_connections_deleted: int
 
+
+class PlanCount(BaseModel):
+	plan_code: str
+	total: int
+
+
+class TurnaroundTrendPoint(BaseModel):
+	day: str
+	avg_duration_ms: float
+
+
+class ProductImpactMetrics(BaseModel):
+	total_revenue_analyzed: float = 0.0
+	repeat_rate: float = 0.0
+	refund_rate: float = 0.0
+	week_over_week_revenue_change_pct: Optional[float] = None
+	based_on_run_id: Optional[int] = None
+	based_on_created_at: Optional[str] = None
+
+
+class UsageVelocityMetrics(BaseModel):
+	analyses_run_7d: int = 0
+	active_users_7d: int = 0
+	csv_to_insight_turnaround_trend: List[TurnaroundTrendPoint] = Field(default_factory=list)
+
+
+class MonitoringReliabilityMetrics(BaseModel):
+	monitor_runs_7d: int = 0
+	success_rate_pct: float = 0.0
+	error_count_7d: int = 0
+	top_error_category: Optional[str] = None
+
+
+class CommercialTractionMetrics(BaseModel):
+	new_signups_7d: int = 0
+	active_subscriptions_by_plan: List[PlanCount] = Field(default_factory=list)
+	payment_success_events_7d: int = 0
+
+
+class FounderPostPackMetricsResponse(BaseModel):
+	generated_at: str
+	window_days: int = 7
+	product_impact: ProductImpactMetrics
+	usage_velocity: UsageVelocityMetrics
+	monitoring_reliability: MonitoringReliabilityMetrics
+	commercial_traction: CommercialTractionMetrics
+

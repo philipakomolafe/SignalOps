@@ -14,6 +14,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("DATABASE_URL", "PERSISTENCE_DATABASE_URL"),
     )
+    admin_emails: str = Field(
+        default="",
+        validation_alias=AliasChoices("ADMIN_EMAILS", "ADMIN_EMAIL"),
+    )
     app_public_base_url: str = "http://127.0.0.1:8000"
     monitor_internal_token: str = Field(
         default="",

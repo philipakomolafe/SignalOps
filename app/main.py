@@ -25,6 +25,7 @@ from app.models.schemas import (
     AnalysisHistoryItem,
     AnalysisResponse,
     DataRetentionRunResponse,
+    FounderPostPackMetricsResponse,
     LoginRequest,
     LoginResponse,
     MonitorRunResponse,
@@ -65,9 +66,11 @@ from app.services.persistence import (
     mark_shopify_connection_synced,
     revoke_session,
     run_data_retention,
+    save_analysis_timing,
     save_payment_event,
     save_monitor_run,
     save_analysis,
+    get_founder_post_pack_metrics,
     upsert_billing_subscription,
     update_shopify_connection_tokens,
     upsert_shopify_connection,
@@ -183,6 +186,8 @@ if WEB_ROOT.exists():
     app.mount("/v1", StaticFiles(directory=WEB_ROOT / "v1", html=True), name="v1")
     # Placeholder buy page for checkout flow.
     app.mount("/buy", StaticFiles(directory=WEB_ROOT / "buy", html=True), name="buy")
+    # Admin metrics page.
+    app.mount("/admin", StaticFiles(directory=WEB_ROOT / "admin", html=True), name="admin")
 
 
 def get_current_user(authorization: str | None = Header(default=None)) -> dict:
@@ -199,6 +204,23 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
     # Return user dict for endpoint dependency injection.
     return user
+
+
+def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ensure current authenticated user is in configured admin email allow-list."""
+    allowed = {
+        email.strip().lower()
+        for email in (settings.admin_emails or "").split(",")
+        if email.strip()
+    }
+    if not allowed:
+        raise HTTPException(status_code=503, detail="Admin access is not configured")
+
+    email = str(current_user.get("email") or "").strip().lower()
+    if email not in allowed:
+        raise HTTPException(status_code=403, detail="Admin access denied")
+
+    return current_user
 
 
 @app.on_event("startup")
@@ -704,6 +726,7 @@ async def analyze_csv(
     current_user: dict = Depends(get_current_user),
 ) -> AnalysisResponse:
     """Analyze uploaded CSV, detect leaks, and persist result."""
+    started_at = time.perf_counter()
     logger.info("Analysis requested by user_id=%s segment=%s file=%s", current_user["user_id"], segment, file.filename)
     # Require a filename to identify uploaded file.
     if not file.filename:
@@ -737,6 +760,11 @@ async def analyze_csv(
         cached_payload["from_cache"] = True
         # Prefer current filename if upload has one.
         cached_payload["source_file"] = file.filename or cached_payload.get("source_file")
+        save_analysis_timing(
+            user_id=current_user["user_id"],
+            source="csv_cached",
+            duration_ms=(time.perf_counter() - started_at) * 1000.0,
+        )
         return AnalysisResponse(**cached_payload)
 
     try:
@@ -772,8 +800,21 @@ async def analyze_csv(
         len(response.findings),
         False,
     )
+    save_analysis_timing(
+        user_id=current_user["user_id"],
+        source="csv_upload",
+        duration_ms=(time.perf_counter() - started_at) * 1000.0,
+    )
     # Return final analysis payload.
     return response
+
+
+@app.get("/api/v1/admin/founder-metrics", response_model=FounderPostPackMetricsResponse)
+def founder_metrics(admin_user: dict = Depends(get_admin_user)) -> FounderPostPackMetricsResponse:
+    """Return founder post-pack metrics for the authenticated admin."""
+    _ = admin_user
+    payload = get_founder_post_pack_metrics(window_days=7)
+    return FounderPostPackMetricsResponse(**payload)
 
 
 @app.post("/api/v1/integrations/shopify/connect/start", response_model=ShopifyConnectStartResponse)

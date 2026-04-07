@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalOPs | Admin Metrics</title>
+  <meta name="description" content="SignalOPs admin founder metrics dashboard." />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="kicker">Private Admin</p>
+        <h1>Founder Metrics</h1>
+        <p class="sub">Auto-refresh snapshot for your weekly posting pack.</p>
+      </div>
+      <div class="topbar-actions">
+        <button id="refreshBtn" class="btn" type="button">Refresh</button>
+        <a class="btn ghost" href="/dashboard/">Open dashboard</a>
+      </div>
+    </header>
+
+    <p id="status" class="status">Loading metrics...</p>
+
+    <section class="panel">
+      <h2>Product impact</h2>
+      <div class="grid metrics">
+        <article class="metric"><span>Total revenue analyzed</span><strong id="totalRevenue">-</strong></article>
+        <article class="metric"><span>Repeat rate</span><strong id="repeatRate">-</strong></article>
+        <article class="metric"><span>Refund rate</span><strong id="refundRate">-</strong></article>
+        <article class="metric"><span>WoW revenue change</span><strong id="wowRevenue">-</strong></article>
+      </div>
+      <p id="productMeta" class="meta"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Usage velocity</h2>
+      <div class="grid metrics">
+        <article class="metric"><span>Analyses run (7d)</span><strong id="analyses7d">-</strong></article>
+        <article class="metric"><span>Active users (7d)</span><strong id="activeUsers7d">-</strong></article>
+      </div>
+      <h3>CSV-to-insight turnaround trend</h3>
+      <ul id="turnaroundTrend" class="list"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Monitoring reliability</h2>
+      <div class="grid metrics">
+        <article class="metric"><span>Monitor runs (7d)</span><strong id="monitorRuns7d">-</strong></article>
+        <article class="metric"><span>Success rate</span><strong id="successRate">-</strong></article>
+        <article class="metric"><span>Error count (7d)</span><strong id="errorCount7d">-</strong></article>
+        <article class="metric"><span>Top error category</span><strong id="topErrorCategory">-</strong></article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Commercial traction</h2>
+      <div class="grid metrics">
+        <article class="metric"><span>New signups (7d)</span><strong id="signups7d">-</strong></article>
+        <article class="metric"><span>Payment success events (7d)</span><strong id="paymentEvents7d">-</strong></article>
+      </div>
+      <h3>Active subscriptions by plan</h3>
+      <ul id="plansList" class="list"></ul>
+    </section>
+  </main>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
