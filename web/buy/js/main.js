@@ -2,6 +2,7 @@
   var params = new URLSearchParams(window.location.search);
   var plan = (params.get("plan") || "starter").trim().toLowerCase();
   var status = (params.get("status") || "").trim().toLowerCase();
+  var shouldAutoRedirect = !status;
   var labelMap = {
     free: "Free",
     starter: "Starter ($29/mo)",
@@ -69,6 +70,11 @@
         setCheckoutState(enabled, checkoutUrl, enabled ? "Continue to secure checkout" : "Checkout unavailable");
         if (accountBtn) {
           accountBtn.href = "/login/";
+        }
+
+        if (enabled && checkoutUrl && shouldAutoRedirect) {
+          window.location.href = checkoutUrl;
+          return;
         }
       }
 
