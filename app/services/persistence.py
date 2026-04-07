@@ -266,6 +266,53 @@ def init_storage() -> None:
                 ON monitor_runs (created_at DESC)
                 """,
             )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS payment_events (
+                    event_id TEXT PRIMARY KEY,
+                    provider TEXT NOT NULL,
+                    event_type TEXT,
+                    status TEXT,
+                    tx_ref TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_payment_events_tx_ref
+                ON payment_events (tx_ref, created_at DESC)
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS billing_subscriptions (
+                    subscription_id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL UNIQUE,
+                    provider TEXT NOT NULL,
+                    plan_code TEXT NOT NULL,
+                    provider_status TEXT NOT NULL,
+                    payer_email TEXT,
+                    tx_ref TEXT,
+                    amount REAL,
+                    currency TEXT,
+                    raw_payload_json TEXT,
+                    last_payment_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_plan
+                ON billing_subscriptions (plan_code, updated_at DESC)
+                """,
+            )
             connection.commit()
             return
 
@@ -397,6 +444,53 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_monitor_runs_created
             ON monitor_runs (created_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS payment_events (
+                event_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                event_type TEXT,
+                status TEXT,
+                tx_ref TEXT,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_payment_events_tx_ref
+            ON payment_events (tx_ref, created_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS billing_subscriptions (
+                subscription_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                provider TEXT NOT NULL,
+                plan_code TEXT NOT NULL,
+                provider_status TEXT NOT NULL,
+                payer_email TEXT,
+                tx_ref TEXT,
+                amount REAL,
+                currency TEXT,
+                raw_payload_json TEXT,
+                last_payment_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_plan
+            ON billing_subscriptions (plan_code, updated_at DESC)
             """,
         )
         connection.commit()
@@ -1032,5 +1126,122 @@ def run_data_retention() -> Dict[str, int]:
         "revoked_sessions_deleted": revoked_sessions_deleted,
         "inactive_connections_deleted": inactive_connections_deleted,
     }
+
+
+def save_payment_event(
+    event_id: str,
+    provider: str,
+    event_type: str,
+    status: str,
+    tx_ref: Optional[str],
+    payload: Dict[str, Any],
+) -> bool:
+    """Persist webhook event once; return False when duplicate event_id already exists."""
+    try:
+        with _connect() as connection:
+            _execute(
+                connection,
+                """
+                INSERT INTO payment_events (event_id, provider, event_type, status, tx_ref, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event_id,
+                    provider,
+                    event_type,
+                    status,
+                    tx_ref,
+                    json.dumps(payload),
+                ),
+            )
+            connection.commit()
+        return True
+    except Exception as exc:
+        if _is_unique_violation(exc):
+            return False
+        raise
+
+
+def upsert_billing_subscription(
+    user_id: int,
+    provider: str,
+    plan_code: str,
+    provider_status: str,
+    payer_email: Optional[str] = None,
+    tx_ref: Optional[str] = None,
+    amount: Optional[float] = None,
+    currency: Optional[str] = None,
+    raw_payload: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Create or update latest billing subscription state for a user."""
+    payload_json = json.dumps(raw_payload or {})
+    with _connect() as connection:
+        if _is_postgres():
+            _execute(
+                connection,
+                """
+                INSERT INTO billing_subscriptions (
+                    user_id, provider, plan_code, provider_status, payer_email, tx_ref, amount, currency, raw_payload_json, last_payment_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id)
+                DO UPDATE SET
+                    provider = EXCLUDED.provider,
+                    plan_code = EXCLUDED.plan_code,
+                    provider_status = EXCLUDED.provider_status,
+                    payer_email = EXCLUDED.payer_email,
+                    tx_ref = EXCLUDED.tx_ref,
+                    amount = EXCLUDED.amount,
+                    currency = EXCLUDED.currency,
+                    raw_payload_json = EXCLUDED.raw_payload_json,
+                    last_payment_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    user_id,
+                    provider,
+                    plan_code,
+                    provider_status,
+                    payer_email,
+                    tx_ref,
+                    amount,
+                    currency,
+                    payload_json,
+                ),
+            )
+        else:
+            _execute(
+                connection,
+                """
+                INSERT INTO billing_subscriptions (
+                    user_id, provider, plan_code, provider_status, payer_email, tx_ref, amount, currency, raw_payload_json, last_payment_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id)
+                DO UPDATE SET
+                    provider = excluded.provider,
+                    plan_code = excluded.plan_code,
+                    provider_status = excluded.provider_status,
+                    payer_email = excluded.payer_email,
+                    tx_ref = excluded.tx_ref,
+                    amount = excluded.amount,
+                    currency = excluded.currency,
+                    raw_payload_json = excluded.raw_payload_json,
+                    last_payment_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    user_id,
+                    provider,
+                    plan_code,
+                    provider_status,
+                    payer_email,
+                    tx_ref,
+                    amount,
+                    currency,
+                    payload_json,
+                ),
+            )
+        connection.commit()
 
 

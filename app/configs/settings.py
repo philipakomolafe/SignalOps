@@ -37,6 +37,42 @@ class Settings(BaseSettings):
         default=300,
         validation_alias=AliasChoices("SHOPIFY_TOKEN_REFRESH_LEEWAY_SECONDS"),
     )
+    flutterwave_public_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_PUBLIC_KEY", "FLUTTERWAVE_PUBLIC_KEY"),
+    )
+    flutterwave_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_SECRET_KEY", "FLUTTERWAVE_SECRET_KEY"),
+    )
+    flutterwave_webhook_secret_hash: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_WEBHOOK_SECRET_HASH", "FLUTTERWAVE_WEBHOOK_SECRET_HASH"),
+    )
+    flutterwave_api_base_url: str = Field(
+        default="https://api.flutterwave.com",
+        validation_alias=AliasChoices("FLW_API_BASE_URL", "FLUTTERWAVE_API_BASE_URL"),
+    )
+    flutterwave_starter_link: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_STARTER_LINK", "FLUTTERWAVE_STARTER_LINK"),
+    )
+    flutterwave_pro_link: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_PRO_LINK", "FLUTTERWAVE_PRO_LINK"),
+    )
+    billing_currency: str = Field(
+        default="USD",
+        validation_alias=AliasChoices("BILLING_CURRENCY"),
+    )
+    billing_starter_amount: float = Field(
+        default=29.0,
+        validation_alias=AliasChoices("BILLING_STARTER_AMOUNT"),
+    )
+    billing_pro_amount: float = Field(
+        default=99.0,
+        validation_alias=AliasChoices("BILLING_PRO_AMOUNT"),
+    )
     retention_monitor_runs_days: int = Field(
         default=30,
         validation_alias=AliasChoices("RETENTION_MONITOR_RUNS_DAYS"),

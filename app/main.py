@@ -65,13 +65,20 @@ from app.services.persistence import (
     mark_shopify_connection_synced,
     revoke_session,
     run_data_retention,
+    save_payment_event,
     save_monitor_run,
     save_analysis,
+    upsert_billing_subscription,
     update_shopify_connection_tokens,
     upsert_shopify_connection,
 )
 # Report builder that converts findings into summary + diagnosis text.
 from app.services.report_generator import build_report
+from app.services.flutterwave import (
+    checkout_link_for_plan,
+    is_valid_webhook_signature,
+    verify_transaction,
+)
 from app.services.shopify import (
     build_install_url,
     build_oauth_state,
@@ -228,14 +235,156 @@ def buy_entry() -> RedirectResponse:
 
 @app.get("/api/v1/buy")
 def buy_status(plan: str | None = Query(default=None)) -> dict:
-    """Placeholder endpoint for upcoming payment integration."""
+    """Return checkout readiness and configured payment link for selected plan."""
     safe_plan = (plan or "").strip().lower() or None
+    if safe_plan == "free":
+        return {
+            "status": "ready",
+            "plan": "free",
+            "checkout_enabled": False,
+            "checkout_url": None,
+            "message": "Free plan does not require payment. Create an account to continue.",
+        }
+
+    checkout_url = checkout_link_for_plan(safe_plan or "")
+    configured = bool(checkout_url)
+
+    if not safe_plan:
+        return {
+            "status": "ready",
+            "plan": None,
+            "checkout_enabled": False,
+            "checkout_url": None,
+            "message": "Select a plan to continue.",
+        }
+
+    if safe_plan not in {"starter", "pro"}:
+        return {
+            "status": "invalid_plan",
+            "plan": safe_plan,
+            "checkout_enabled": False,
+            "checkout_url": None,
+            "message": "Unsupported plan selection.",
+        }
+
     return {
-        "status": "ready",
-        "message": "Payment page is prepared. Checkout integration will be enabled once payment details are provided.",
+        "status": "ready" if configured else "not_configured",
+        "message": "Secure checkout link is ready." if configured else "Payment link is not configured yet.",
         "plan": safe_plan,
-        "checkout_enabled": False,
+        "checkout_enabled": configured,
+        "checkout_url": checkout_url if configured else None,
     }
+
+
+def _resolve_plan_from_payment(tx_ref: str | None, amount: object, currency: object) -> str | None:
+    """Resolve plan using tx_ref hint first, then amount/currency fallback."""
+    ref = (tx_ref or "").strip().lower()
+    if "starter" in ref:
+        return "starter"
+    if "pro" in ref:
+        return "pro"
+
+    try:
+        paid_amount = float(amount)
+    except (TypeError, ValueError):
+        return None
+
+    paid_currency = str(currency or "").strip().upper()
+    expected_currency = (settings.billing_currency or "USD").strip().upper()
+    if paid_currency and paid_currency != expected_currency:
+        return None
+
+    if abs(paid_amount - float(settings.billing_starter_amount)) < 0.01:
+        return "starter"
+    if abs(paid_amount - float(settings.billing_pro_amount)) < 0.01:
+        return "pro"
+    return None
+
+
+@app.post("/api/v1/payments/flutterwave/webhook")
+async def flutterwave_webhook(
+    request: Request,
+    flutterwave_signature: str | None = Header(default=None, alias="flutterwave-signature"),
+) -> dict:
+    """Receive Flutterwave webhook, verify authenticity, and activate matching subscription."""
+    raw_body = await request.body()
+    if not is_valid_webhook_signature(raw_body, flutterwave_signature):
+        raise HTTPException(status_code=401, detail="Invalid Flutterwave webhook signature")
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload") from exc
+
+    event_id = str(payload.get("id") or hashlib.sha256(raw_body).hexdigest())
+    event_type = str(payload.get("type") or "unknown")
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    provider_status = str(data.get("status") or "unknown")
+    tx_ref = str(data.get("tx_ref") or data.get("reference") or "").strip() or None
+
+    created = save_payment_event(
+        event_id=event_id,
+        provider="flutterwave",
+        event_type=event_type,
+        status=provider_status,
+        tx_ref=tx_ref,
+        payload=payload,
+    )
+    if not created:
+        return {"status": "ok", "deduplicated": True}
+
+    if event_type != "charge.completed":
+        return {"status": "ok", "ignored": event_type}
+
+    transaction_id = str(data.get("id") or "").strip()
+    if not transaction_id:
+        return {"status": "ok", "ignored": "missing_transaction_id"}
+
+    try:
+        verify_response = verify_transaction(transaction_id)
+    except Exception:
+        logger.exception("Flutterwave verification failed for tx_id=%s", transaction_id)
+        raise HTTPException(status_code=502, detail="Failed to verify Flutterwave transaction")
+
+    if str(verify_response.get("status") or "").strip().lower() != "success":
+        return {"status": "ok", "ignored": "verification_unsuccessful"}
+
+    verified_data = verify_response.get("data") if isinstance(verify_response.get("data"), dict) else {}
+    payment_status = str(verified_data.get("status") or "").strip().lower()
+    if payment_status not in {"successful", "succeeded"}:
+        return {"status": "ok", "ignored": "payment_not_successful"}
+
+    customer = verified_data.get("customer") if isinstance(verified_data.get("customer"), dict) else {}
+    payer_email = str(customer.get("email") or "").strip().lower()
+    if not payer_email:
+        return {"status": "ok", "pending": "missing_payer_email"}
+
+    user = get_user_by_email(payer_email)
+    if not user:
+        logger.warning("Flutterwave paid email has no SignalOps user match: %s", payer_email)
+        return {"status": "ok", "pending": "user_not_found"}
+
+    plan_code = _resolve_plan_from_payment(
+        tx_ref=tx_ref or str(verified_data.get("tx_ref") or "").strip() or None,
+        amount=verified_data.get("amount"),
+        currency=verified_data.get("currency"),
+    )
+    if not plan_code:
+        return {"status": "ok", "pending": "plan_unresolved"}
+
+    upsert_billing_subscription(
+        user_id=user["user_id"],
+        provider="flutterwave",
+        plan_code=plan_code,
+        provider_status="active",
+        payer_email=payer_email,
+        tx_ref=tx_ref or str(verified_data.get("tx_ref") or "").strip() or None,
+        amount=float(verified_data.get("amount") or 0),
+        currency=str(verified_data.get("currency") or "").strip().upper() or None,
+        raw_payload=verify_response,
+    )
+
+    return {"status": "ok", "activated_user_id": user["user_id"], "plan": plan_code}
 
 
 @app.get("/c/{conversation_id}")
