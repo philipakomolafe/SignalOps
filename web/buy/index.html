@@ -23,14 +23,16 @@
     </section>
 
     <div class="actions">
-      <a class="btn" id="checkoutBtn" href="#" aria-disabled="true">Continue to checkout</a>
+      <button class="btn" id="checkoutBtn" type="button" aria-disabled="true">Continue to checkout</button>
       <a class="btn ghost" href="/v1/#pricing">Back to pricing</a>
       <a class="btn ghost" id="accountBtn" href="/login/#register">Create account</a>
     </div>
 
     <p class="status" id="statusText">Checking buy API readiness...</p>
+    <div class="activation-badge is-hidden" id="activationBadge" aria-live="polite"></div>
   </main>
 
+  <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

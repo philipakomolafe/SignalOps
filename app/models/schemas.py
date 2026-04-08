@@ -191,3 +191,20 @@ class AdminFeatureTimeSeriesResponse(BaseModel):
 	window_days: int = 30
 	points: List[FeatureTimeSeriesPoint] = Field(default_factory=list)
 
+
+class FlutterwaveInitializeRequest(BaseModel):
+	plan: str = Field(min_length=3, max_length=20)
+
+
+class FlutterwaveInitializeResponse(BaseModel):
+	public_key: str
+	tx_ref: str
+	amount: float
+	currency: str
+	payment_plan: str
+	customer_email: EmailStr
+	customer_name: str
+	customization_title: str = "SignalOps Subscription"
+	customization_description: str = "SignalOps plan checkout"
+	status: str = "ready"
+

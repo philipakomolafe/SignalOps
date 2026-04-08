@@ -65,6 +65,14 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("FLW_PRO_LINK", "FLUTTERWAVE_PRO_LINK"),
     )
+    flutterwave_starter_plan_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_STARTER_PLAN_ID", "FLUTTERWAVE_STARTER_PLAN_ID"),
+    )
+    flutterwave_pro_plan_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("FLW_PRO_PLAN_ID", "FLUTTERWAVE_PRO_PLAN_ID"),
+    )
     billing_currency: str = Field(
         default="USD",
         validation_alias=AliasChoices("BILLING_CURRENCY"),

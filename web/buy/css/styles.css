@@ -94,6 +94,7 @@ p {
 }
 
 .btn {
+  appearance: none;
   text-decoration: none;
   color: #ffffff;
   background: var(--ink);
@@ -101,6 +102,8 @@ p {
   border-radius: 999px;
   padding: 11px 16px;
   font-size: 0.92rem;
+  font-family: inherit;
+  cursor: pointer;
   width: 100%;
   max-width: 290px;
 }
@@ -116,4 +119,36 @@ p {
   color: #3f3f3f;
   min-height: 1.2rem;
   max-width: 42ch;
+}
+
+.activation-badge {
+  margin-top: 0.65rem;
+  border: 1px solid #cdcdcd;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  letter-spacing: 0.1px;
+  color: #2a2a2a;
+  background: #f9f9f9;
+}
+
+.activation-badge.is-hidden {
+  display: none;
+}
+
+.activation-badge.is-pending {
+  border-color: #b7b7b7;
+  background: #f1f1f1;
+}
+
+.activation-badge.is-success {
+  border-color: #7a7a7a;
+  background: #e7e7e7;
+  color: #151515;
+}
+
+.activation-badge.is-error {
+  border-color: #9d9d9d;
+  background: #efefef;
+  color: #2d2d2d;
 }

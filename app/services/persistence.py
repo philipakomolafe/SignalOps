@@ -750,6 +750,31 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch user row by user_id, including email and public profile fields."""
+    with _connect() as connection:
+        row = _execute(
+            connection,
+            """
+            SELECT user_id, full_name, email, company
+            FROM users
+            WHERE user_id = ?
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "user_id": int(row["user_id"]),
+        "full_name": str(row["full_name"]),
+        "email": str(row["email"]),
+        "company": str(row["company"]) if row["company"] else None,
+    }
+
+
 def create_session(user_id: int, token_hash: str) -> Dict[str, Any]:
     """Create session record for authenticated user token hash."""
     logger.info("Creating session for user_id=%s", user_id)
