@@ -13,8 +13,8 @@
     <header class="topbar">
       <div>
         <p class="kicker">Private Admin</p>
-        <h1>Founder Metrics</h1>
-        <p class="sub">Auto-refresh snapshot for your weekly posting pack.</p>
+        <h1>Feature Metric Trends</h1>
+        <p class="sub">All feature datapoints over time in compact metric cards.</p>
       </div>
       <div class="topbar-actions">
         <button id="refreshBtn" class="btn" type="button">Refresh</button>
@@ -24,45 +24,57 @@
 
     <p id="status" class="status">Loading metrics...</p>
 
-    <section class="panel">
-      <h2>Product impact</h2>
-      <div class="grid metrics">
-        <article class="metric"><span>Total revenue analyzed</span><strong id="totalRevenue">-</strong></article>
-        <article class="metric"><span>Repeat rate</span><strong id="repeatRate">-</strong></article>
-        <article class="metric"><span>Refund rate</span><strong id="refundRate">-</strong></article>
-        <article class="metric"><span>WoW revenue change</span><strong id="wowRevenue">-</strong></article>
+    <section class="panel controls">
+      <h2>Window</h2>
+      <div class="range-actions" id="rangeActions">
+        <button class="range-btn active" type="button" data-days="30">30 days</button>
+        <button class="range-btn" type="button" data-days="60">60 days</button>
+        <button class="range-btn" type="button" data-days="90">90 days</button>
       </div>
-      <p id="productMeta" class="meta"></p>
+      <p class="meta" id="windowMeta"></p>
     </section>
 
-    <section class="panel">
-      <h2>Usage velocity</h2>
-      <div class="grid metrics">
-        <article class="metric"><span>Analyses run (7d)</span><strong id="analyses7d">-</strong></article>
-        <article class="metric"><span>Active users (7d)</span><strong id="activeUsers7d">-</strong></article>
-      </div>
-      <h3>CSV-to-insight turnaround trend</h3>
-      <ul id="turnaroundTrend" class="list"></ul>
-    </section>
-
-    <section class="panel">
-      <h2>Monitoring reliability</h2>
-      <div class="grid metrics">
-        <article class="metric"><span>Monitor runs (7d)</span><strong id="monitorRuns7d">-</strong></article>
-        <article class="metric"><span>Success rate</span><strong id="successRate">-</strong></article>
-        <article class="metric"><span>Error count (7d)</span><strong id="errorCount7d">-</strong></article>
-        <article class="metric"><span>Top error category</span><strong id="topErrorCategory">-</strong></article>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>Commercial traction</h2>
-      <div class="grid metrics">
-        <article class="metric"><span>New signups (7d)</span><strong id="signups7d">-</strong></article>
-        <article class="metric"><span>Payment success events (7d)</span><strong id="paymentEvents7d">-</strong></article>
-      </div>
-      <h3>Active subscriptions by plan</h3>
-      <ul id="plansList" class="list"></ul>
+    <section class="charts-grid" id="chartsGrid">
+      <article class="chart-card" data-key="total_revenue">
+        <h3>Total Revenue</h3>
+        <strong id="value-total_revenue">-</strong>
+        <canvas id="chart-total_revenue" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="order_count">
+        <h3>Order Count</h3>
+        <strong id="value-order_count">-</strong>
+        <canvas id="chart-order_count" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="customer_count">
+        <h3>Customer Count</h3>
+        <strong id="value-customer_count">-</strong>
+        <canvas id="chart-customer_count" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="revenue_per_user">
+        <h3>Revenue Per User</h3>
+        <strong id="value-revenue_per_user">-</strong>
+        <canvas id="chart-revenue_per_user" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="purchase_frequency">
+        <h3>Purchase Frequency</h3>
+        <strong id="value-purchase_frequency">-</strong>
+        <canvas id="chart-purchase_frequency" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="repeat_rate">
+        <h3>Repeat Rate</h3>
+        <strong id="value-repeat_rate">-</strong>
+        <canvas id="chart-repeat_rate" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="refund_rate">
+        <h3>Refund Rate</h3>
+        <strong id="value-refund_rate">-</strong>
+        <canvas id="chart-refund_rate" width="360" height="130"></canvas>
+      </article>
+      <article class="chart-card" data-key="week_over_week_revenue_change_pct">
+        <h3>WoW Revenue Change</h3>
+        <strong id="value-week_over_week_revenue_change_pct">-</strong>
+        <canvas id="chart-week_over_week_revenue_change_pct" width="360" height="130"></canvas>
+      </article>
     </section>
   </main>
 

@@ -168,3 +168,26 @@ class FounderPostPackMetricsResponse(BaseModel):
 	monitoring_reliability: MonitoringReliabilityMetrics
 	commercial_traction: CommercialTractionMetrics
 
+
+class AccountPlanResponse(BaseModel):
+	plan_code: str
+	is_admin: bool = False
+
+
+class FeatureTimeSeriesPoint(BaseModel):
+	timestamp: str
+	total_revenue: float = 0.0
+	order_count: int = 0
+	customer_count: int = 0
+	revenue_per_user: float = 0.0
+	purchase_frequency: float = 0.0
+	repeat_rate: float = 0.0
+	refund_rate: float = 0.0
+	week_over_week_revenue_change_pct: Optional[float] = None
+
+
+class AdminFeatureTimeSeriesResponse(BaseModel):
+	generated_at: str
+	window_days: int = 30
+	points: List[FeatureTimeSeriesPoint] = Field(default_factory=list)
+

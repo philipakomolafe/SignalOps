@@ -21,6 +21,8 @@ from fastapi.staticfiles import StaticFiles
 from app.configs.settings import settings
 # Typed request/response models used by auth and analysis endpoints.
 from app.models.schemas import (
+    AccountPlanResponse,
+    AdminFeatureTimeSeriesResponse,
     AuthUser,
     AnalysisHistoryItem,
     AnalysisResponse,
@@ -57,6 +59,8 @@ from app.services.persistence import (
     deactivate_shopify_connection,
     find_analysis_by_hash,
     get_analysis,
+    get_active_billing_subscription_by_user,
+    get_admin_feature_timeseries,
     get_shopify_connection_by_user,
     get_user_by_email,
     get_user_by_session_hash,
@@ -206,18 +210,54 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict:
     return user
 
 
-def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
-    """Ensure current authenticated user is in configured admin email allow-list."""
-    allowed = {
+def _allowed_admin_emails() -> set[str]:
+    """Return normalized configured admin email allow-list."""
+    return {
         email.strip().lower()
         for email in (settings.admin_emails or "").split(",")
         if email.strip()
     }
+
+
+def _is_admin_user(current_user: dict) -> bool:
+    """Check whether a user belongs to configured admin email set."""
+    allowed = _allowed_admin_emails()
+    if not allowed:
+        return False
+    email = str(current_user.get("email") or "").strip().lower()
+    return email in allowed
+
+
+def _resolve_user_plan(current_user: dict) -> str:
+    """Resolve effective plan code with admin override."""
+    if _is_admin_user(current_user):
+        return "admin"
+
+    subscription = get_active_billing_subscription_by_user(int(current_user["user_id"]))
+    if not subscription:
+        return "free"
+
+    plan = str(subscription.get("plan_code") or "free").strip().lower()
+    if plan in {"starter", "pro"}:
+        return plan
+    return "free"
+
+
+def _require_plan(current_user: dict, allowed: set[str], denied_detail: str) -> str:
+    """Ensure user's effective plan is in allow-list and return the resolved plan."""
+    plan = _resolve_user_plan(current_user)
+    if plan not in allowed:
+        raise HTTPException(status_code=403, detail=denied_detail)
+    return plan
+
+
+def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Ensure current authenticated user is in configured admin email allow-list."""
+    allowed = _allowed_admin_emails()
     if not allowed:
         raise HTTPException(status_code=503, detail="Admin access is not configured")
 
-    email = str(current_user.get("email") or "").strip().lower()
-    if email not in allowed:
+    if not _is_admin_user(current_user):
         raise HTTPException(status_code=403, detail="Admin access denied")
 
     return current_user
@@ -296,6 +336,15 @@ def buy_status(plan: str | None = Query(default=None)) -> dict:
         "checkout_enabled": configured,
         "checkout_url": checkout_url if configured else None,
     }
+
+
+@app.get("/api/v1/account/plan", response_model=AccountPlanResponse)
+def account_plan(current_user: dict = Depends(get_current_user)) -> AccountPlanResponse:
+    """Return effective account plan for feature gating in frontend/backend."""
+    return AccountPlanResponse(
+        plan_code=_resolve_user_plan(current_user),
+        is_admin=_is_admin_user(current_user),
+    )
 
 
 def _resolve_plan_from_payment(tx_ref: str | None, amount: object, currency: object) -> str | None:
@@ -495,6 +544,11 @@ def analysis_history(
     current_user: dict = Depends(get_current_user),
 ) -> list[AnalysisHistoryItem]:
     """List recent analyses for the authenticated user."""
+    _require_plan(
+        current_user,
+        {"starter", "pro", "admin"},
+        "History is available on Starter and Pro plans.",
+    )
     # Fetch user-scoped analysis history.
     rows = list_analyses(user_id=current_user["user_id"], limit=limit)
     # Convert raw rows into response models.
@@ -507,6 +561,11 @@ def analysis_by_id(
     current_user: dict = Depends(get_current_user),
 ) -> AnalysisResponse:
     """Fetch one saved analysis by run ID for current user."""
+    _require_plan(
+        current_user,
+        {"starter", "pro", "admin"},
+        "History is available on Starter and Pro plans.",
+    )
     # Retrieve analysis payload using user scope.
     payload = get_analysis(run_id=run_id, user_id=current_user["user_id"])
     # Missing payload means not found or not owned by this user.
@@ -726,6 +785,15 @@ async def analyze_csv(
     current_user: dict = Depends(get_current_user),
 ) -> AnalysisResponse:
     """Analyze uploaded CSV, detect leaks, and persist result."""
+    plan = _resolve_user_plan(current_user)
+    if plan == "free":
+        existing_runs = list_analyses(user_id=current_user["user_id"], limit=2)
+        if len(existing_runs) >= 1:
+            raise HTTPException(
+                status_code=403,
+                detail="Free plan supports one CSV analysis. Upgrade to Starter or Pro for continuous analysis.",
+            )
+
     started_at = time.perf_counter()
     logger.info("Analysis requested by user_id=%s segment=%s file=%s", current_user["user_id"], segment, file.filename)
     # Require a filename to identify uploaded file.
@@ -817,12 +885,33 @@ def founder_metrics(admin_user: dict = Depends(get_admin_user)) -> FounderPostPa
     return FounderPostPackMetricsResponse(**payload)
 
 
+@app.get("/api/v1/admin/feature-timeseries", response_model=AdminFeatureTimeSeriesResponse)
+def admin_feature_timeseries(
+    days: int = Query(default=30, ge=7, le=180),
+    admin_user: dict = Depends(get_admin_user),
+) -> AdminFeatureTimeSeriesResponse:
+    """Return feature-level time-series points for admin chart cards."""
+    _ = admin_user
+    points = get_admin_feature_timeseries(window_days=days)
+    return AdminFeatureTimeSeriesResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        window_days=days,
+        points=points,
+    )
+
+
 @app.post("/api/v1/integrations/shopify/connect/start", response_model=ShopifyConnectStartResponse)
 def shopify_connect_start(
     payload: ShopifyConnectStartRequest,
     current_user: dict = Depends(get_current_user),
 ) -> ShopifyConnectStartResponse:
     """Generate Shopify OAuth install URL for current user."""
+    _require_plan(
+        current_user,
+        {"pro", "admin"},
+        "Shopify integration is available on Pro plan.",
+    )
+
     if not settings.shopify_api_key or not settings.shopify_api_secret:
         raise HTTPException(status_code=503, detail="Shopify integration is not configured")
 
@@ -881,6 +970,12 @@ def shopify_connect_callback(request: Request):
 @app.get("/api/v1/integrations/shopify/status", response_model=ShopifyConnectionStatusResponse)
 def shopify_status(current_user: dict = Depends(get_current_user)) -> ShopifyConnectionStatusResponse:
     """Return current user's Shopify integration status."""
+    _require_plan(
+        current_user,
+        {"pro", "admin"},
+        "Shopify integration is available on Pro plan.",
+    )
+
     row = get_shopify_connection_by_user(current_user["user_id"])
     if not row:
         return ShopifyConnectionStatusResponse(connected=False)
@@ -895,6 +990,12 @@ def shopify_status(current_user: dict = Depends(get_current_user)) -> ShopifyCon
 @app.post("/api/v1/integrations/shopify/disconnect")
 def shopify_disconnect(current_user: dict = Depends(get_current_user)) -> dict:
     """Disconnect Shopify integration for current user."""
+    _require_plan(
+        current_user,
+        {"pro", "admin"},
+        "Shopify integration is available on Pro plan.",
+    )
+
     deactivate_shopify_connection(current_user["user_id"])
     return {"status": "ok"}
 
@@ -914,6 +1015,12 @@ async def shopify_orders_webhook(
 @app.post("/api/v1/integrations/shopify/monitor-now", response_model=MonitorRunResponse)
 def run_shopify_monitor_now(current_user: dict = Depends(get_current_user)) -> MonitorRunResponse:
     """Run monitor immediately for the authenticated user's connected store."""
+    _require_plan(
+        current_user,
+        {"pro", "admin"},
+        "Shopify monitoring is available on Pro plan.",
+    )
+
     segment = "shopify-5k-25k"
     connection = get_shopify_connection_by_user(current_user["user_id"])
     if not connection:

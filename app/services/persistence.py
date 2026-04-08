@@ -1299,6 +1299,90 @@ def upsert_billing_subscription(
         connection.commit()
 
 
+def get_active_billing_subscription_by_user(user_id: int) -> Optional[Dict[str, Any]]:
+    """Return active billing subscription row for a user when present."""
+    with _connect() as connection:
+        row = _execute(
+            connection,
+            """
+            SELECT user_id, provider, plan_code, provider_status, payer_email, tx_ref, amount, currency, updated_at
+            FROM billing_subscriptions
+            WHERE user_id = ? AND lower(provider_status) = 'active'
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "user_id": int(row["user_id"]),
+        "provider": str(row["provider"]),
+        "plan_code": str(row["plan_code"]),
+        "provider_status": str(row["provider_status"]),
+        "payer_email": str(row["payer_email"]) if row["payer_email"] else None,
+        "tx_ref": str(row["tx_ref"]) if row["tx_ref"] else None,
+        "amount": float(row["amount"]) if row["amount"] is not None else None,
+        "currency": str(row["currency"]) if row["currency"] else None,
+        "updated_at": str(row["updated_at"]) if row["updated_at"] else None,
+    }
+
+
+def get_admin_feature_timeseries(window_days: int = 30) -> List[Dict[str, Any]]:
+    """Return ordered per-run feature points from persisted analyses for admin charting."""
+    where_sql, params = _window_filter_sql("created_at", max(1, int(window_days)))
+    with _connect() as connection:
+        rows = _execute(
+            connection,
+            f"""
+            SELECT created_at, payload_json
+            FROM analysis_runs
+            WHERE {where_sql}
+            ORDER BY run_id ASC
+            """,
+            params,
+        ).fetchall()
+
+    points: List[Dict[str, Any]] = []
+    for row in rows:
+        created_at = str(row["created_at"])
+        try:
+            payload = json.loads(str(row["payload_json"] or "{}"))
+        except Exception:
+            payload = {}
+
+        features = payload.get("features") if isinstance(payload, dict) else {}
+        if not isinstance(features, dict):
+            continue
+
+        wow_raw = features.get("week_over_week_revenue_change_pct")
+        wow_value: Optional[float]
+        if wow_raw is None:
+            wow_value = None
+        else:
+            try:
+                wow_value = float(wow_raw)
+            except (TypeError, ValueError):
+                wow_value = None
+
+        points.append(
+            {
+                "timestamp": created_at,
+                "total_revenue": float(features.get("total_revenue") or 0.0),
+                "order_count": int(features.get("order_count") or 0),
+                "customer_count": int(features.get("customer_count") or 0),
+                "revenue_per_user": float(features.get("revenue_per_user") or 0.0),
+                "purchase_frequency": float(features.get("purchase_frequency") or 0.0),
+                "repeat_rate": float(features.get("repeat_rate") or 0.0),
+                "refund_rate": float(features.get("refund_rate") or 0.0),
+                "week_over_week_revenue_change_pct": wow_value,
+            }
+        )
+
+    return points
+
+
 def _window_filter_sql(column: str, days: int) -> tuple[str, tuple[Any, ...]]:
     """Return backend-specific WHERE snippet + params for N-day lookback."""
     safe_days = max(1, int(days))

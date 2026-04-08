@@ -1,10 +1,24 @@
 (function () {
   var TOKEN_STORAGE_KEY = "signalops_access_token";
   var API_BASE = (window.SIGNALOPS_API_BASE || window.location.origin || "").replace(/\/$/, "");
-  var ENDPOINT = API_BASE + "/api/v1/admin/founder-metrics";
+  var ENDPOINT = API_BASE + "/api/v1/admin/feature-timeseries";
+  var activeDays = 30;
 
   var statusEl = document.getElementById("status");
   var refreshBtn = document.getElementById("refreshBtn");
+  var rangeActions = document.getElementById("rangeActions");
+  var windowMeta = document.getElementById("windowMeta");
+
+  var METRICS = [
+    { key: "total_revenue", format: formatMoney },
+    { key: "order_count", format: formatNumber },
+    { key: "customer_count", format: formatNumber },
+    { key: "revenue_per_user", format: formatMoney },
+    { key: "purchase_frequency", format: formatNumber },
+    { key: "repeat_rate", format: formatPercent },
+    { key: "refund_rate", format: formatPercent },
+    { key: "week_over_week_revenue_change_pct", format: formatPercent },
+  ];
 
   function setText(id, value) {
     var node = document.getElementById(id);
@@ -18,51 +32,85 @@
     statusEl.classList.toggle("error", !!isError);
   }
 
-  function fmtMoney(amount) {
+  function formatMoney(amount) {
     return "$" + Number(amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
-  function fmtPct(value) {
+  function formatPercent(value) {
     if (value === null || value === undefined) return "N/A";
     return Number(value).toFixed(2) + "%";
   }
 
-  function renderTrend(rows) {
-    var list = document.getElementById("turnaroundTrend");
-    if (!list) return;
-    list.innerHTML = "";
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      var empty = document.createElement("li");
-      empty.textContent = "No turnaround trend data yet. Run more analyses to populate this.";
-      list.appendChild(empty);
-      return;
-    }
-
-    rows.forEach(function (row) {
-      var li = document.createElement("li");
-      li.textContent = row.day + ": " + Number(row.avg_duration_ms || 0).toFixed(0) + " ms";
-      list.appendChild(li);
-    });
+  function formatNumber(value) {
+    return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
-  function renderPlans(rows) {
-    var list = document.getElementById("plansList");
-    if (!list) return;
-    list.innerHTML = "";
+  function setValue(metricKey, valueText) {
+    var node = document.getElementById("value-" + metricKey);
+    if (node) {
+      node.textContent = valueText;
+    }
+  }
 
-    if (!Array.isArray(rows) || rows.length === 0) {
-      var empty = document.createElement("li");
-      empty.textContent = "No active subscriptions yet.";
-      list.appendChild(empty);
+  function getSeries(points, metricKey) {
+    return points
+      .map(function (point) {
+        var raw = point[metricKey];
+        if (raw === null || raw === undefined) {
+          return null;
+        }
+        var value = Number(raw);
+        return Number.isFinite(value) ? value : null;
+      })
+      .filter(function (value) {
+        return value !== null;
+      });
+  }
+
+  function drawSparkline(metricKey, values) {
+    var canvas = document.getElementById("chart-" + metricKey);
+    if (!canvas) {
+      return;
+    }
+    var ctx = canvas.getContext("2d");
+    if (!ctx) {
       return;
     }
 
-    rows.forEach(function (row) {
-      var li = document.createElement("li");
-      li.textContent = String(row.plan_code || "unknown") + ": " + Number(row.total || 0);
-      list.appendChild(li);
-    });
+    var width = canvas.width;
+    var height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.strokeStyle = "#d8d8d8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, height - 24);
+    ctx.lineTo(width, height - 24);
+    ctx.stroke();
+
+    if (!values || values.length === 0) {
+      return;
+    }
+
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    var spread = max - min || 1;
+    var xStep = values.length > 1 ? (width - 12) / (values.length - 1) : 0;
+
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    for (var i = 0; i < values.length; i += 1) {
+      var x = 6 + xStep * i;
+      var y = height - 28 - ((values[i] - min) / spread) * (height - 48);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
   }
 
   function requireAuthToken() {
@@ -75,42 +123,20 @@
   }
 
   function render(payload) {
-    var product = payload.product_impact || {};
-    var usage = payload.usage_velocity || {};
-    var monitoring = payload.monitoring_reliability || {};
-    var commercial = payload.commercial_traction || {};
+    var points = Array.isArray(payload.points) ? payload.points : [];
+    METRICS.forEach(function (metric) {
+      var values = getSeries(points, metric.key);
+      var latest = values.length ? values[values.length - 1] : null;
+      setValue(metric.key, latest === null ? "N/A" : metric.format(latest));
+      drawSparkline(metric.key, values);
+    });
 
-    setText("totalRevenue", fmtMoney(product.total_revenue_analyzed));
-    setText("repeatRate", fmtPct(product.repeat_rate));
-    setText("refundRate", fmtPct(product.refund_rate));
-    setText("wowRevenue", fmtPct(product.week_over_week_revenue_change_pct));
-
-    var meta = [];
-    if (product.based_on_run_id) {
-      meta.push("Based on run #" + product.based_on_run_id);
+    if (windowMeta) {
+      windowMeta.textContent =
+        "Showing " + String(points.length) + " points over " + String(payload.window_days || activeDays) + " days.";
     }
-    if (product.based_on_created_at) {
-      meta.push("at " + product.based_on_created_at);
-    }
-    setText("productMeta", meta.join(" "));
 
-    setText("analyses7d", String(usage.analyses_run_7d || 0));
-    setText("activeUsers7d", String(usage.active_users_7d || 0));
-    renderTrend(usage.csv_to_insight_turnaround_trend || []);
-
-    setText("monitorRuns7d", String(monitoring.monitor_runs_7d || 0));
-    setText("successRate", fmtPct(monitoring.success_rate_pct));
-    setText("errorCount7d", String(monitoring.error_count_7d || 0));
-    setText("topErrorCategory", monitoring.top_error_category || "N/A");
-
-    setText("signups7d", String(commercial.new_signups_7d || 0));
-    setText("paymentEvents7d", String(commercial.payment_success_events_7d || 0));
-    renderPlans(commercial.active_subscriptions_by_plan || []);
-
-    setStatus(
-      "Metrics refreshed. Window: " + String(payload.window_days || 7) + " days. Generated at " + (payload.generated_at || "N/A"),
-      false
-    );
+    setStatus("Metrics refreshed at " + (payload.generated_at || "N/A"), false);
   }
 
   function loadMetrics() {
@@ -118,7 +144,7 @@
     if (!token) return;
 
     setStatus("Loading metrics...", false);
-    fetch(ENDPOINT, {
+    fetch(ENDPOINT + "?days=" + encodeURIComponent(String(activeDays)), {
       headers: {
         Authorization: "Bearer " + token,
       },
@@ -146,9 +172,38 @@
       });
   }
 
+  function wireRangeButtons() {
+    if (!rangeActions) {
+      return;
+    }
+    rangeActions.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+      var daysAttr = target.getAttribute("data-days");
+      if (!daysAttr) {
+        return;
+      }
+      var parsed = Number(daysAttr);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return;
+      }
+      activeDays = parsed;
+
+      var buttons = rangeActions.querySelectorAll(".range-btn");
+      buttons.forEach(function (btn) {
+        btn.classList.remove("active");
+      });
+      target.classList.add("active");
+      loadMetrics();
+    });
+  }
+
   if (refreshBtn) {
     refreshBtn.addEventListener("click", loadMetrics);
   }
+  wireRangeButtons();
 
   loadMetrics();
 })();
