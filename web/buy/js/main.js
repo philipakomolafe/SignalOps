@@ -4,6 +4,8 @@
   var plan = (params.get("plan") || "starter").trim().toLowerCase();
   var status = (params.get("status") || "").trim().toLowerCase();
   var returnPath = (params.get("return") || "").trim();
+  var resume = (params.get("resume") || "").trim().toLowerCase();
+  var shouldResumeCheckout = resume === "1" || resume === "true";
   var authToken = localStorage.getItem(TOKEN_STORAGE_KEY);
   var labelMap = {
     free: "Free",
@@ -158,7 +160,11 @@
   }
 
   function loginUrlForCurrentPlan() {
-    return "/login/?next=" + encodeURIComponent("/buy/?plan=" + encodeURIComponent(plan));
+    var nextPath = "/buy/?plan=" + encodeURIComponent(plan) + "&resume=1";
+    if (returnPath) {
+      nextPath += "&return=" + encodeURIComponent(returnPath);
+    }
+    return "/login/?next=" + encodeURIComponent(nextPath);
   }
 
   function dashboardReturnUrl(state) {
@@ -300,6 +306,11 @@
         setCheckoutState(enabled, enabled ? "Continue to secure checkout" : "Checkout unavailable");
         if (accountBtn) {
           accountBtn.href = authToken ? "/dashboard/" : loginUrlForCurrentPlan();
+        }
+
+        if (enabled && authToken && shouldResumeCheckout && !status) {
+          initializeCheckout();
+          return;
         }
       }
 

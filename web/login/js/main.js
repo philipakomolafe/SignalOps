@@ -13,6 +13,20 @@ const panels = Array.from(document.querySelectorAll(".tab-panel"));
 
 let isRedirectingToDashboard = false;
 
+function postAuthDestination() {
+  const params = new URLSearchParams(window.location.search);
+  const next = (params.get("next") || "").trim();
+  if (!next) {
+    return "/dashboard/";
+  }
+
+  // Allow only same-origin absolute paths to avoid open redirects.
+  if (next.charAt(0) !== "/" || next.slice(0, 2) === "//") {
+    return "/dashboard/";
+  }
+  return next;
+}
+
 function setStatus(message, isError = false) {
   if (!statusEl) return;
   statusEl.textContent = message;
@@ -40,7 +54,7 @@ function goToDashboard() {
   if (isRedirectingToDashboard) return;
   isRedirectingToDashboard = true;
   // replace() prevents keeping login as a sticky destination in browser history.
-  window.location.replace("/dashboard/");
+  window.location.replace(postAuthDestination());
 }
 
 async function redirectIfSessionIsActive() {
