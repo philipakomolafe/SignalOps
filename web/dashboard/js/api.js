@@ -7,6 +7,7 @@ const SHOPIFY_CONNECT_START_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/
 const SHOPIFY_STATUS_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/status`;
 const SHOPIFY_DISCONNECT_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/disconnect`;
 const SHOPIFY_MONITOR_NOW_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/monitor-now`;
+const ACCOUNT_PLAN_ENDPOINT = `${API_BASE}/api/v1/account/plan`;
 
 function authHeaders(extraHeaders = {}) {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -104,4 +105,11 @@ export async function runShopifyMonitorNow() {
     headers: authHeaders(),
   });
   return parseResponse(response, "Failed to run Shopify monitor.");
+}
+
+export async function fetchAccountPlan() {
+  const response = await fetch(ACCOUNT_PLAN_ENDPOINT, {
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "Failed to fetch account plan.");
 }

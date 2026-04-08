@@ -576,10 +576,82 @@
     font-size: 1.08rem;
   }
 
+
   .workspace-top p {
     font-size: 0.79rem;
   }
 
+  .workspace-billing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .plan-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #d2d9e3;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    color: #405066;
+    background: #f7f9fc;
+  }
+
+  .upgrade-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #243449;
+    border-radius: 999px;
+    padding: 6px 12px;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: #1f2f44;
+  }
+
+  .upgrade-link:hover {
+    background: #172536;
+  }
+
+  .upgrade-link[hidden] {
+    display: none !important;
+  }
+
+  .billing-note {
+    margin: 8px 18px 0;
+    border: 1px solid #d7dde6;
+    border-radius: 10px;
+    background: #f9fbff;
+    color: #37465a;
+    font-size: 0.82rem;
+    padding: 7px 10px;
+  }
+
+  .billing-note.is-success {
+    border-color: #c8d3e0;
+    background: #f1f5fa;
+    color: #253447;
+  }
+
+  .billing-note.is-pending {
+    border-color: #d8dee8;
+    background: #fbfcfe;
+  }
+
+  @media (max-width: 980px) {
+    .workspace-billing {
+      justify-content: flex-start;
+    }
+
+    .billing-note {
+      margin: 8px 12px 0;
+    }
+  }
   .feed-empty {
     padding: 14px 10px;
   }

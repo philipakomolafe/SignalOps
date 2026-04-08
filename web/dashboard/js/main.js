@@ -1,6 +1,7 @@
 import {
   analyzeCsv,
   disconnectShopify,
+  fetchAccountPlan,
   fetchAnalysisById,
   fetchAnalysisHistory,
   fetchCurrentUser,
@@ -30,6 +31,9 @@ const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
+const planPillEl = document.getElementById("plan-pill");
+const upgradeLinkEl = document.getElementById("upgrade-link");
+const billingNoteEl = document.getElementById("billing-note");
 let currentRunId = null;
 
 function runIdToConversationId(runId) {
@@ -77,6 +81,76 @@ function setStatus(message, isError = false) {
   if (!statusEl) return;
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+}
+
+function setBillingNote(message, state = "pending") {
+  if (!billingNoteEl) return;
+  if (!message) {
+    billingNoteEl.hidden = true;
+    billingNoteEl.textContent = "";
+    billingNoteEl.classList.remove("is-success", "is-pending");
+    return;
+  }
+
+  billingNoteEl.hidden = false;
+  billingNoteEl.textContent = message;
+  billingNoteEl.classList.remove("is-success", "is-pending");
+  billingNoteEl.classList.add(state === "success" ? "is-success" : "is-pending");
+}
+
+function formatPlanLabel(planCode, isAdmin) {
+  if (isAdmin) return "Admin";
+  const safe = String(planCode || "free").toLowerCase();
+  if (safe === "starter") return "Starter";
+  if (safe === "pro") return "Pro";
+  return "Free";
+}
+
+function syncUpgradeLinkForPlan(planCode, isAdmin) {
+  if (!upgradeLinkEl || !planPillEl) return;
+
+  const safe = String(planCode || "free").toLowerCase();
+  const isPaid = safe === "starter" || safe === "pro" || isAdmin;
+  planPillEl.textContent = "Plan: " + formatPlanLabel(planCode, isAdmin);
+
+  if (isPaid) {
+    upgradeLinkEl.hidden = true;
+    return;
+  }
+
+  const returnPath = "/dashboard/?billing=pending";
+  const targetPlan = safe === "free" ? "starter" : safe;
+  upgradeLinkEl.href =
+    "/buy/?plan=" + encodeURIComponent(targetPlan) + "&return=" + encodeURIComponent(returnPath);
+  upgradeLinkEl.hidden = false;
+}
+
+async function loadAccountPlanAndBillingUi() {
+  try {
+    const account = await fetchAccountPlan();
+    syncUpgradeLinkForPlan(account.plan_code, !!account.is_admin);
+  } catch (error) {
+    if (error.message === "AUTH_REQUIRED") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
+      return;
+    }
+    syncUpgradeLinkForPlan("free", false);
+  }
+}
+
+function applyBillingReturnHint() {
+  const params = new URLSearchParams(window.location.search);
+  const billing = (params.get("billing") || "").trim().toLowerCase();
+  if (billing === "activated") {
+    setBillingNote("Subscription active. Premium tools are now unlocked.", "success");
+    return;
+  }
+  if (billing === "pending") {
+    setBillingNote("Payment submitted. Your plan usually updates within a few moments.", "pending");
+    return;
+  }
+  setBillingNote("");
 }
 
 function pickFile(file) {
@@ -371,6 +445,8 @@ async function bootstrap() {
     }
     await loadHistory();
     await loadShopifyStatus();
+    await loadAccountPlanAndBillingUi();
+    applyBillingReturnHint();
 
     const conversationId = readConversationIdFromHash();
     if (conversationId) {

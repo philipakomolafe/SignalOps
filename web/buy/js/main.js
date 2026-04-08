@@ -3,6 +3,7 @@
   var params = new URLSearchParams(window.location.search);
   var plan = (params.get("plan") || "starter").trim().toLowerCase();
   var status = (params.get("status") || "").trim().toLowerCase();
+  var returnPath = (params.get("return") || "").trim();
   var authToken = localStorage.getItem(TOKEN_STORAGE_KEY);
   var labelMap = {
     free: "Free",
@@ -122,6 +123,9 @@
             if (accountBtn) {
               accountBtn.href = "/dashboard/";
             }
+            window.setTimeout(function () {
+              window.location.href = dashboardReturnUrl("activated");
+            }, 900);
             return;
           }
 
@@ -155,6 +159,19 @@
 
   function loginUrlForCurrentPlan() {
     return "/login/?next=" + encodeURIComponent("/buy/?plan=" + encodeURIComponent(plan));
+  }
+
+  function dashboardReturnUrl(state) {
+    var safePath = returnPath;
+    if (!safePath || safePath.charAt(0) !== "/" || safePath.slice(0, 2) === "//") {
+      safePath = "/dashboard/";
+    }
+
+    var joiner = safePath.indexOf("?") >= 0 ? "&" : "?";
+    if (safePath.indexOf("billing=") >= 0) {
+      return safePath;
+    }
+    return safePath + joiner + "billing=" + encodeURIComponent(state || "activated");
   }
 
   function initializeCheckout() {
@@ -212,7 +229,11 @@
             description: payload.customization_description || "SignalOps plan checkout",
           },
           callback: function () {
-            window.location.href = "/buy/?plan=" + encodeURIComponent(plan) + "&status=success";
+            var nextUrl = "/buy/?plan=" + encodeURIComponent(plan) + "&status=success";
+            if (returnPath) {
+              nextUrl += "&return=" + encodeURIComponent(returnPath);
+            }
+            window.location.href = nextUrl;
           },
           onclose: function () {
             setStatus("Checkout closed. You can try again anytime.");

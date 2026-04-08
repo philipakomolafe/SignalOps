@@ -35,9 +35,13 @@
   padding: 14px 18px 12px;
   border-bottom: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 10px;
+}
+
+.workspace-title {
+  min-width: 0;
 }
 
 .workspace-top h1 {
@@ -91,6 +95,8 @@
 
   .workspace-top {
     padding: 12px 12px 10px;
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .analysis-feed {

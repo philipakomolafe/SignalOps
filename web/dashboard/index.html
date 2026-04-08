@@ -63,11 +63,16 @@
 
     <main class="workspace">
       <header class="workspace-top">
-        <div>
+        <div class="workspace-title">
           <h1>Analysis Workspace</h1>
           <p>Drop a CSV and SignalOPs will generate diagnosis in this panel.</p>
         </div>
+        <div class="workspace-billing" id="workspace-billing">
+          <span class="plan-pill" id="plan-pill">Plan: Free</span>
+          <a class="upgrade-link" id="upgrade-link" href="/buy/?plan=starter">Upgrade</a>
+        </div>
       </header>
+      <section class="billing-note" id="billing-note" hidden aria-live="polite"></section>
 
       <section id="analysis-feed" class="analysis-feed" aria-live="polite">
         <article class="feed-empty" id="feed-empty">
