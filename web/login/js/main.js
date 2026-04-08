@@ -1,6 +1,7 @@
 import { fetchCurrentUser, login, signup } from "./api.js";
 
 const TOKEN_STORAGE_KEY = "signalops_access_token";
+const RESUME_CHECKOUT_KEY = "signalops_resume_checkout";
 
 const signinForm = document.getElementById("signin-form");
 const registerForm = document.getElementById("register-form");
@@ -17,7 +18,23 @@ function postAuthDestination() {
   const params = new URLSearchParams(window.location.search);
   const next = (params.get("next") || "").trim();
   if (!next) {
-    return "/dashboard/";
+    try {
+      const raw = sessionStorage.getItem(RESUME_CHECKOUT_KEY);
+      if (!raw) {
+        return "/dashboard/";
+      }
+      const parsed = JSON.parse(raw);
+      const plan = String(parsed && parsed.plan ? parsed.plan : "starter").trim().toLowerCase();
+      const safePlan = plan === "pro" ? "pro" : "starter";
+      const returnPath = String(parsed && parsed.returnPath ? parsed.returnPath : "").trim();
+      let resumePath = `/buy/?plan=${encodeURIComponent(safePlan)}&resume=1`;
+      if (returnPath && returnPath.charAt(0) === "/" && returnPath.slice(0, 2) !== "//") {
+        resumePath += `&return=${encodeURIComponent(returnPath)}`;
+      }
+      return resumePath;
+    } catch (_error) {
+      return "/dashboard/";
+    }
   }
 
   // Allow only same-origin absolute paths to avoid open redirects.

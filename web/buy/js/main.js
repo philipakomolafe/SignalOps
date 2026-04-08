@@ -1,5 +1,6 @@
 (function () {
   var TOKEN_STORAGE_KEY = "signalops_access_token";
+  var RESUME_CHECKOUT_KEY = "signalops_resume_checkout";
   var params = new URLSearchParams(window.location.search);
   var plan = (params.get("plan") || "starter").trim().toLowerCase();
   var status = (params.get("status") || "").trim().toLowerCase();
@@ -188,6 +189,18 @@
 
     if (!authToken) {
       setStatus("Login is required before payment checkout.");
+      try {
+        sessionStorage.setItem(
+          RESUME_CHECKOUT_KEY,
+          JSON.stringify({
+            plan: plan,
+            returnPath: returnPath || "",
+            createdAt: Date.now(),
+          })
+        );
+      } catch (_error) {
+        // Ignore storage failures and continue redirect flow.
+      }
       window.location.href = loginUrlForCurrentPlan();
       return;
     }
@@ -309,6 +322,11 @@
         }
 
         if (enabled && authToken && shouldResumeCheckout && !status) {
+          try {
+            sessionStorage.removeItem(RESUME_CHECKOUT_KEY);
+          } catch (_error) {
+            // Non-blocking cleanup.
+          }
           initializeCheckout();
           return;
         }
