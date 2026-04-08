@@ -107,14 +107,15 @@ function formatPlanLabel(planCode, isAdmin) {
 }
 
 function syncUpgradeLinkForPlan(planCode, isAdmin) {
-  if (!upgradeLinkEl || !planPillEl) return;
+  const hangerEl = document.getElementById("billing-hanger");
+  if (!upgradeLinkEl || !planPillEl || !hangerEl) return;
 
   const safe = String(planCode || "free").toLowerCase();
   const isPaid = safe === "starter" || safe === "pro" || isAdmin;
-  planPillEl.textContent = "Plan: " + formatPlanLabel(planCode, isAdmin);
+  planPillEl.textContent = isPaid ? (formatPlanLabel(planCode, isAdmin) + " Active") : "Unlock";
 
   if (isPaid) {
-    upgradeLinkEl.hidden = true;
+    hangerEl.hidden = true;
     return;
   }
 
@@ -122,7 +123,7 @@ function syncUpgradeLinkForPlan(planCode, isAdmin) {
   const targetPlan = safe === "free" ? "starter" : safe;
   upgradeLinkEl.href =
     "/buy/?plan=" + encodeURIComponent(targetPlan) + "&return=" + encodeURIComponent(returnPath);
-  upgradeLinkEl.hidden = false;
+  hangerEl.hidden = false;
 }
 
 async function loadAccountPlanAndBillingUi() {

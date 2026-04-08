@@ -464,6 +464,60 @@
   color: #9a2626;
 }
 
+.billing-hanger {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  z-index: 4;
+}
+
+.billing-hanger-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  text-decoration: none;
+  background: #111111;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.billing-hanger-link:hover {
+  transform: translateY(1px);
+}
+
+.billing-hanger-label {
+  color: #f4f4f4;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.billing-note {
+  margin: 8px 18px 0;
+  border: 1px solid #d7dde6;
+  border-radius: 10px;
+  background: #f9fbff;
+  color: #37465a;
+  font-size: 0.82rem;
+  padding: 7px 10px;
+}
+
+.billing-note.is-success {
+  border-color: #c8d3e0;
+  background: #f1f5fa;
+  color: #253447;
+}
+
+.billing-note.is-pending {
+  border-color: #d8dee8;
+  background: #fbfcfe;
+}
+
 @media (max-width: 980px) {
   .brand span,
   .brand-sub,
@@ -581,77 +635,20 @@
     font-size: 0.79rem;
   }
 
-  .workspace-billing {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+  .billing-hanger-link {
+    min-width: 74px;
+    padding: 5px 9px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
   }
 
-  .plan-pill {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid #d2d9e3;
-    border-radius: 999px;
-    padding: 4px 10px;
-    font-size: 0.74rem;
-    color: #405066;
-    background: #f7f9fc;
-  }
-
-  .upgrade-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #243449;
-    border-radius: 999px;
-    padding: 6px 12px;
-    text-decoration: none;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #ffffff;
-    background: #1f2f44;
-  }
-
-  .upgrade-link:hover {
-    background: #172536;
-  }
-
-  .upgrade-link[hidden] {
-    display: none !important;
+  .billing-hanger-label {
+    font-size: 0.62rem;
   }
 
   .billing-note {
-    margin: 8px 18px 0;
-    border: 1px solid #d7dde6;
-    border-radius: 10px;
-    background: #f9fbff;
-    color: #37465a;
-    font-size: 0.82rem;
-    padding: 7px 10px;
+    margin: 8px 12px 0;
   }
 
-  .billing-note.is-success {
-    border-color: #c8d3e0;
-    background: #f1f5fa;
-    color: #253447;
-  }
-
-  .billing-note.is-pending {
-    border-color: #d8dee8;
-    background: #fbfcfe;
-  }
-
-  @media (max-width: 980px) {
-    .workspace-billing {
-      justify-content: flex-start;
-    }
-
-    .billing-note {
-      margin: 8px 12px 0;
-    }
-  }
   .feed-empty {
     padding: 14px 10px;
   }

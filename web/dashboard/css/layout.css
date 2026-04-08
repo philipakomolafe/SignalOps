@@ -32,11 +32,11 @@
 }
 
 .workspace-top {
-  padding: 14px 18px 12px;
+  padding: 40px 18px 12px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
 }
 
@@ -94,7 +94,7 @@
   }
 
   .workspace-top {
-    padding: 12px 12px 10px;
+    padding: 34px 12px 10px;
     align-items: stretch;
     flex-direction: column;
   }

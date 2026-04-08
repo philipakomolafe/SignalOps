@@ -62,14 +62,15 @@
     </aside>
 
     <main class="workspace">
+      <div class="billing-hanger" id="billing-hanger" hidden>
+        <a class="billing-hanger-link" id="upgrade-link" href="/buy/?plan=starter">
+          <span class="billing-hanger-label" id="plan-pill">Unlock</span>
+        </a>
+      </div>
       <header class="workspace-top">
         <div class="workspace-title">
           <h1>Analysis Workspace</h1>
           <p>Drop a CSV and SignalOPs will generate diagnosis in this panel.</p>
-        </div>
-        <div class="workspace-billing" id="workspace-billing">
-          <span class="plan-pill" id="plan-pill">Plan: Free</span>
-          <a class="upgrade-link" id="upgrade-link" href="/buy/?plan=starter">Upgrade</a>
         </div>
       </header>
       <section class="billing-note" id="billing-note" hidden aria-live="polite"></section>
