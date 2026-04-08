@@ -67,6 +67,46 @@
       });
   }
 
+  function sumSeries(values) {
+    return values.reduce(function (acc, value) {
+      return acc + value;
+    }, 0);
+  }
+
+  function averageSeries(values) {
+    if (!values.length) {
+      return null;
+    }
+    return sumSeries(values) / values.length;
+  }
+
+  function computeCombinedMetrics(points) {
+    var revenueSeries = getSeries(points, "total_revenue");
+    var orderSeries = getSeries(points, "order_count");
+    var customerSeries = getSeries(points, "customer_count");
+    var repeatRateSeries = getSeries(points, "repeat_rate");
+    var refundRateSeries = getSeries(points, "refund_rate");
+    var wowSeries = getSeries(points, "week_over_week_revenue_change_pct");
+
+    var totalRevenue = sumSeries(revenueSeries);
+    var totalOrders = sumSeries(orderSeries);
+    var totalCustomers = sumSeries(customerSeries);
+
+    var revenuePerUser = totalCustomers > 0 ? totalRevenue / totalCustomers : null;
+    var purchaseFrequency = totalCustomers > 0 ? totalOrders / totalCustomers : null;
+
+    return {
+      total_revenue: totalRevenue,
+      order_count: totalOrders,
+      customer_count: totalCustomers,
+      revenue_per_user: revenuePerUser,
+      purchase_frequency: purchaseFrequency,
+      repeat_rate: averageSeries(repeatRateSeries),
+      refund_rate: averageSeries(refundRateSeries),
+      week_over_week_revenue_change_pct: averageSeries(wowSeries),
+    };
+  }
+
   function drawSparkline(metricKey, values) {
     var canvas = document.getElementById("chart-" + metricKey);
     if (!canvas) {
@@ -124,16 +164,18 @@
 
   function render(payload) {
     var points = Array.isArray(payload.points) ? payload.points : [];
+    var combined = computeCombinedMetrics(points);
+
     METRICS.forEach(function (metric) {
       var values = getSeries(points, metric.key);
-      var latest = values.length ? values[values.length - 1] : null;
-      setValue(metric.key, latest === null ? "N/A" : metric.format(latest));
+      var combinedValue = combined[metric.key];
+      setValue(metric.key, combinedValue === null || combinedValue === undefined ? "N/A" : metric.format(combinedValue));
       drawSparkline(metric.key, values);
     });
 
     if (windowMeta) {
       windowMeta.textContent =
-        "Showing " + String(points.length) + " points over " + String(payload.window_days || activeDays) + " days.";
+        "Showing " + String(points.length) + " points over " + String(payload.window_days || activeDays) + " days (combined totals).";
     }
 
     setStatus("Metrics refreshed at " + (payload.generated_at || "N/A"), false);
