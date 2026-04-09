@@ -14,6 +14,8 @@ It currently supports:
 - Admin analytics views
 - Plan-based billing and access control with Flutterwave
 
+Detailed developer/API reference: see `docs/API.md`.
+
 ## What Is Implemented
 
 ### Analysis + Diagnostics
@@ -141,49 +143,9 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - `/index.html` -> `/`
 - Chat-style redirect: `/c/<conversation_id>` -> dashboard conversation route
 
-## Key API Endpoints
+## API Documentation
 
-### System
-
-- `GET /health`
-
-### Auth
-
-- `POST /api/v1/auth/signup`
-- `POST /api/v1/auth/login`
-- `GET /api/v1/auth/me`
-- `POST /api/v1/auth/logout`
-
-### Analysis
-
-- `POST /api/v1/srl/analyze`
-- `GET /api/v1/srl/history`
-- `GET /api/v1/srl/history/{run_id}`
-
-### Shopify
-
-- `POST /api/v1/integrations/shopify/connect/start`
-- `GET /api/v1/integrations/shopify/callback`
-- `GET /api/v1/integrations/shopify/status`
-- `POST /api/v1/integrations/shopify/disconnect`
-- `POST /api/v1/integrations/shopify/monitor-now`
-- `POST /api/v1/monitor/run/shopify` (internal token)
-
-### Billing
-
-- `GET /api/v1/buy`
-- `POST /api/v1/payments/flutterwave/initialize`
-- `POST /api/v1/payments/flutterwave/webhook`
-- `GET /api/v1/account/plan`
-
-### Admin
-
-- `GET /api/v1/admin/founder-metrics`
-- `GET /api/v1/admin/feature-timeseries`
-
-### Maintenance
-
-- `POST /api/v1/maintenance/data-retention/run` (internal token)
+For full endpoint inventory, request/response expectations, and scheduler routes, see `docs/API.md`.
 
 ## Environment Variables
 
@@ -255,16 +217,11 @@ FLW_PRO_PLAN_ID=
 
 ## Scheduled Jobs
 
-You can run cron either with your platform scheduler or GitHub Actions.
+SignalOps supports scheduled monitor and retention jobs.
 
-Recommended schedules:
+Use your platform scheduler or GitHub Actions workflow in `.github/workflows/signalops-cron.yml`.
 
-- Shopify monitor: `POST /api/v1/monitor/run/shopify` every 30 minutes
-- Retention cleanup: `POST /api/v1/maintenance/data-retention/run` once daily
-
-Required header for both:
-
-- `x-monitor-token: <MONITOR_INTERNAL_TOKEN>`
+Route details are documented in `docs/API.md`.
 
 ## Current Product Notes
 
