@@ -104,11 +104,16 @@ pip install -r requirements.txt
 
 ```bash
 # Linux/macOS
-export DATABASE_URL="postgres://user:password@host:port/dbname?sslmode=require"
+export DATABASE_URL="postgres://<db_user>:<db_password>@<db_host>:<db_port>/<db_name>?sslmode=require"
 
 # Windows PowerShell
-$env:DATABASE_URL="postgres://user:password@host:port/dbname?sslmode=require"
+$env:DATABASE_URL="postgres://<db_user>:<db_password>@<db_host>:<db_port>/<db_name>?sslmode=require"
 ```
+
+Security note:
+
+- Never commit real credentials, API keys, or tokens to git.
+- Keep production secrets only in your deployment secret manager (Render, Aiven, GitHub Secrets, etc.).
 
 3. Start API + static routes
 
@@ -182,6 +187,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 ## Environment Variables
 
+All variables below are names only. Use real values in your deployment secret manager, not in this README.
+
 ### Core
 
 - `DATABASE_URL` (optional, for PostgreSQL)
@@ -224,6 +231,28 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - `RETENTION_INACTIVE_SHOPIFY_DAYS`
 - `RETENTION_ANALYSIS_RUNS_DAYS`
 
+Recommended local setup:
+
+- Create a local `.env` file for development values.
+- Add `.env` to `.gitignore`.
+- Commit only an `.env.example` with placeholders.
+
+Example `.env.example` (safe placeholders only):
+
+```env
+DATABASE_URL=
+ADMIN_EMAILS=
+MONITOR_INTERNAL_TOKEN=
+SHOPIFY_API_KEY=
+SHOPIFY_API_SECRET=
+SHOPIFY_STATE_SECRET=
+FLW_PUBLIC_KEY=
+FLW_SECRET_KEY=
+FLW_WEBHOOK_SECRET_HASH=
+FLW_STARTER_PLAN_ID=
+FLW_PRO_PLAN_ID=
+```
+
 ## Scheduled Jobs
 
 You can run cron either with your platform scheduler or GitHub Actions.
@@ -243,6 +272,7 @@ Required header for both:
 - Admin routes require configured admin email allow-list.
 - Shopify support is intentionally scoped to non-protected order data for faster deployment and reduced compliance friction.
 - Frontend assets are served from `/assets`.
+- If any secret was previously committed, rotate it immediately.
 
 ---
 
