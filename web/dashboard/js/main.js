@@ -5,13 +5,14 @@ import {
   fetchAnalysisById,
   fetchAnalysisHistory,
   fetchCurrentUser,
+  fetchUserPerformance,
   fetchShopifyStatus,
   logout,
   runShopifyMonitorNow,
   startShopifyConnect,
 } from "./api.js";
 import { TOKEN_STORAGE_KEY } from "./config.js";
-import { renderAnalysis, renderHistoryList, renderUploadEvent, resetFeed } from "./render.js";
+import { renderAnalysis, renderHistoryList, renderPerformanceDefault, renderUploadEvent, resetFeed } from "./render.js";
 
 const feed = document.getElementById("analysis-feed");
 const empty = document.getElementById("feed-empty");
@@ -34,6 +35,11 @@ const shopifyStatusEl = document.getElementById("shopify-status");
 const planPillEl = document.getElementById("plan-pill");
 const upgradeLinkEl = document.getElementById("upgrade-link");
 const billingNoteEl = document.getElementById("billing-note");
+const perfRevenueEl = document.getElementById("perf-revenue");
+const perfOrdersEl = document.getElementById("perf-orders");
+const perfCustomersEl = document.getElementById("perf-customers");
+const perfWowEl = document.getElementById("perf-wow");
+const perfMetaEl = document.getElementById("perf-meta");
 let currentRunId = null;
 
 function runIdToConversationId(runId) {
@@ -221,6 +227,50 @@ function showSingleAnalysis(payload, fileName = null) {
   }
 }
 
+function renderSidebarPerformance(payload) {
+  var summary = payload && payload.summary ? payload.summary : {};
+  if (perfRevenueEl) {
+    perfRevenueEl.textContent = "$" + Number(summary.total_revenue || 0).toLocaleString();
+  }
+  if (perfOrdersEl) {
+    perfOrdersEl.textContent = Number(summary.order_count || 0).toLocaleString();
+  }
+  if (perfCustomersEl) {
+    perfCustomersEl.textContent = Number(summary.customer_count || 0).toLocaleString();
+  }
+  if (perfWowEl) {
+    perfWowEl.textContent =
+      summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
+        ? "N/A"
+        : Number(summary.week_over_week_revenue_change_pct).toFixed(2) + "%";
+  }
+  if (perfMetaEl) {
+    var pointCount = Array.isArray(payload && payload.points) ? payload.points.length : 0;
+    perfMetaEl.textContent =
+      "Combined from " + String(pointCount) + " runs over " + String(payload.window_days || 7) + " days.";
+  }
+}
+
+async function loadSevenDayPerformance(showInWorkspace = true) {
+  try {
+    const payload = await fetchUserPerformance(7);
+    renderSidebarPerformance(payload);
+    if (showInWorkspace) {
+      currentRunId = null;
+      resetFeed(feed);
+      renderPerformanceDefault(feed, payload);
+      feed.scrollTop = 0;
+    }
+  } catch (error) {
+    if (error.message === "AUTH_REQUIRED") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
+      return;
+    }
+    setStatus(error.message || "Failed to load 7-day performance.", true);
+  }
+}
+
 async function loadHistory() {
   try {
     const rows = await fetchAnalysisHistory(20);
@@ -304,6 +354,7 @@ if (form) {
         setStatus("Analysis complete.");
       }
       await loadHistory();
+      await loadSevenDayPerformance(false);
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -399,6 +450,7 @@ if (shopifySyncBtn) {
       setShopifyStatus(`Monitor complete. Analyses: ${result.triggered_analyses}.`);
       await loadHistory();
       await loadShopifyStatus();
+      await loadSevenDayPerformance(false);
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -444,6 +496,7 @@ async function bootstrap() {
       const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
       userNameEl.textContent = me.full_name || fallbackName;
     }
+    await loadSevenDayPerformance(true);
     await loadHistory();
     await loadShopifyStatus();
     await loadAccountPlanAndBillingUi();

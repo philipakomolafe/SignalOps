@@ -33,6 +33,8 @@ from app.models.schemas import (
     MonitorRunResponse,
     FlutterwaveInitializeRequest,
     FlutterwaveInitializeResponse,
+    UserPerformanceResponse,
+    UserPerformanceSummary,
     ShopifyConnectionStatusResponse,
     ShopifyConnectStartRequest,
     ShopifyConnectStartResponse,
@@ -63,6 +65,7 @@ from app.services.persistence import (
     get_analysis,
     get_active_billing_subscription_by_user,
     get_admin_feature_timeseries,
+    get_user_feature_timeseries,
     get_shopify_connection_by_user,
     get_user_by_id,
     get_user_by_email,
@@ -418,6 +421,61 @@ def _resolve_plan_from_payment(tx_ref: str | None, amount: object, currency: obj
     if abs(paid_amount - float(settings.billing_pro_amount)) < 0.01:
         return "pro"
     return None
+
+
+def _combine_feature_points(points: list[dict]) -> UserPerformanceSummary:
+    """Aggregate feature points into one business-truth summary for dashboard defaults."""
+    if not points:
+        return UserPerformanceSummary()
+
+    total_revenue = sum(float(point.get("total_revenue") or 0.0) for point in points)
+    total_orders = sum(int(point.get("order_count") or 0) for point in points)
+    total_customers = sum(int(point.get("customer_count") or 0) for point in points)
+
+    repeat_values = [
+        float(point.get("repeat_rate"))
+        for point in points
+        if point.get("repeat_rate") is not None
+    ]
+    refund_values = [
+        float(point.get("refund_rate"))
+        for point in points
+        if point.get("refund_rate") is not None
+    ]
+    wow_values = [
+        float(point.get("week_over_week_revenue_change_pct"))
+        for point in points
+        if point.get("week_over_week_revenue_change_pct") is not None
+    ]
+
+    return UserPerformanceSummary(
+        total_revenue=round(total_revenue, 2),
+        order_count=total_orders,
+        customer_count=total_customers,
+        revenue_per_user=round(total_revenue / total_customers, 2) if total_customers else 0.0,
+        purchase_frequency=round(total_orders / total_customers, 2) if total_customers else 0.0,
+        repeat_rate=round(sum(repeat_values) / len(repeat_values), 2) if repeat_values else 0.0,
+        refund_rate=round(sum(refund_values) / len(refund_values), 2) if refund_values else 0.0,
+        week_over_week_revenue_change_pct=(
+            round(sum(wow_values) / len(wow_values), 2) if wow_values else None
+        ),
+    )
+
+
+@app.get("/api/v1/srl/performance", response_model=UserPerformanceResponse)
+def user_performance(
+    days: int = Query(default=7, ge=1, le=30),
+    current_user: dict = Depends(get_current_user),
+) -> UserPerformanceResponse:
+    """Return user-scoped rolling-window performance for default dashboard business view."""
+    points = get_user_feature_timeseries(user_id=int(current_user["user_id"]), window_days=days)
+    summary = _combine_feature_points(points)
+    return UserPerformanceResponse(
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        window_days=days,
+        points=points,
+        summary=summary,
+    )
 
 
 @app.post("/api/v1/payments/flutterwave/webhook")
@@ -858,6 +916,9 @@ async def analyze_csv(
     # Restrict ingestion to CSV format for current MVP.
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only .csv files are supported for MVP ingestion")
+
+    if segment not in {"shopify-5k-25k", "shopify-25k-100k", "shopify-100k+"}:
+        raise HTTPException(status_code=400, detail="Invalid segment selection")
 
     # Read full upload contents into memory.
     raw = await file.read()

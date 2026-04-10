@@ -77,6 +77,46 @@ export function renderAnalysis(feed, payload) {
   feed.appendChild(wrapper);
 }
 
+export function renderPerformanceDefault(feed, payload) {
+  const summary = payload && payload.summary ? payload.summary : {};
+  const wrapper = el("article", "feed-message system");
+  wrapper.appendChild(el("h3", "", "7-Day Store Performance"));
+  wrapper.appendChild(
+    el(
+      "p",
+      "",
+      "This is your rolling business view. Use Recent Analyses in the sidebar to open individual run snapshots."
+    )
+  );
+
+  const metricsGrid = el("div", "metrics-grid");
+  metricsGrid.appendChild(metric("Total Revenue", `$${Number(summary.total_revenue || 0).toLocaleString()}`));
+  metricsGrid.appendChild(metric("Orders", Number(summary.order_count || 0).toLocaleString()));
+  metricsGrid.appendChild(metric("Customers", Number(summary.customer_count || 0).toLocaleString()));
+  metricsGrid.appendChild(metric("Revenue/User", `$${Number(summary.revenue_per_user || 0).toLocaleString()}`));
+  metricsGrid.appendChild(metric("Purchase Frequency", Number(summary.purchase_frequency || 0).toFixed(2)));
+  metricsGrid.appendChild(
+    metric(
+      "WoW Revenue",
+      summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
+        ? "N/A"
+        : `${Number(summary.week_over_week_revenue_change_pct).toFixed(2)}%`
+    )
+  );
+  wrapper.appendChild(metricsGrid);
+
+  const points = Array.isArray(payload && payload.points) ? payload.points.length : 0;
+  wrapper.appendChild(
+    el(
+      "p",
+      "",
+      `Combined from ${points} runs over ${payload && payload.window_days ? payload.window_days : 7} days.`
+    )
+  );
+
+  feed.appendChild(wrapper);
+}
+
 export function clearEmptyState(feed, empty) {
   if (empty && feed.contains(empty)) {
     feed.removeChild(empty);

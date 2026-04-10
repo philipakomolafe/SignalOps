@@ -1408,6 +1408,60 @@ def get_admin_feature_timeseries(window_days: int = 30) -> List[Dict[str, Any]]:
     return points
 
 
+def get_user_feature_timeseries(user_id: int, window_days: int = 7) -> List[Dict[str, Any]]:
+    """Return ordered per-run feature points for one user over a rolling lookback window."""
+    where_sql, params = _window_filter_sql("created_at", max(1, int(window_days)))
+    with _connect() as connection:
+        rows = _execute(
+            connection,
+            f"""
+            SELECT created_at, payload_json
+            FROM analysis_runs
+            WHERE user_id = ? AND {where_sql}
+            ORDER BY run_id ASC
+            """,
+            (int(user_id), *params),
+        ).fetchall()
+
+    points: List[Dict[str, Any]] = []
+    for row in rows:
+        created_at = str(row["created_at"])
+        try:
+            payload = json.loads(str(row["payload_json"] or "{}"))
+        except Exception:
+            payload = {}
+
+        features = payload.get("features") if isinstance(payload, dict) else {}
+        if not isinstance(features, dict):
+            continue
+
+        wow_raw = features.get("week_over_week_revenue_change_pct")
+        wow_value: Optional[float]
+        if wow_raw is None:
+            wow_value = None
+        else:
+            try:
+                wow_value = float(wow_raw)
+            except (TypeError, ValueError):
+                wow_value = None
+
+        points.append(
+            {
+                "timestamp": created_at,
+                "total_revenue": float(features.get("total_revenue") or 0.0),
+                "order_count": int(features.get("order_count") or 0),
+                "customer_count": int(features.get("customer_count") or 0),
+                "revenue_per_user": float(features.get("revenue_per_user") or 0.0),
+                "purchase_frequency": float(features.get("purchase_frequency") or 0.0),
+                "repeat_rate": float(features.get("repeat_rate") or 0.0),
+                "refund_rate": float(features.get("refund_rate") or 0.0),
+                "week_over_week_revenue_change_pct": wow_value,
+            }
+        )
+
+    return points
+
+
 def _window_filter_sql(column: str, days: int) -> tuple[str, tuple[Any, ...]]:
     """Return backend-specific WHERE snippet + params for N-day lookback."""
     safe_days = max(1, int(days))

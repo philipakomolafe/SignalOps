@@ -192,6 +192,24 @@ class AdminFeatureTimeSeriesResponse(BaseModel):
 	points: List[FeatureTimeSeriesPoint] = Field(default_factory=list)
 
 
+class UserPerformanceSummary(BaseModel):
+	total_revenue: float = 0.0
+	order_count: int = 0
+	customer_count: int = 0
+	revenue_per_user: float = 0.0
+	purchase_frequency: float = 0.0
+	repeat_rate: float = 0.0
+	refund_rate: float = 0.0
+	week_over_week_revenue_change_pct: Optional[float] = None
+
+
+class UserPerformanceResponse(BaseModel):
+	generated_at: str
+	window_days: int = 7
+	points: List[FeatureTimeSeriesPoint] = Field(default_factory=list)
+	summary: UserPerformanceSummary
+
+
 class FlutterwaveInitializeRequest(BaseModel):
 	plan: str = Field(min_length=3, max_length=20)
 
