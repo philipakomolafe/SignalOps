@@ -121,39 +121,25 @@
 }
 
 .perf-block {
-  display: grid;
-  gap: 6px;
+  padding: 6px;
 }
 
-.perf-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.perf-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid #dde2ea;
-  border-radius: 8px;
+.perf-home-btn {
+  width: 100%;
+  border: 1px solid #d6dde7;
+  border-radius: 9px;
   background: #ffffff;
-  padding: 5px 7px;
+  color: #243142;
+  text-align: left;
+  padding: 7px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.perf-list span {
-  font-size: 0.69rem;
-  color: #596579;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.perf-list strong {
-  font-family: "Manrope", sans-serif;
-  font-size: 0.78rem;
-  color: #1f2a3a;
+.perf-home-btn:hover {
+  border-color: #bac9e3;
+  background: #f7faff;
 }
 
 .sidebar-user {

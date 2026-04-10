@@ -32,15 +32,12 @@ const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
+const perfHomeBtn = document.getElementById("perf-home-btn");
 const planPillEl = document.getElementById("plan-pill");
 const upgradeLinkEl = document.getElementById("upgrade-link");
 const billingNoteEl = document.getElementById("billing-note");
-const perfRevenueEl = document.getElementById("perf-revenue");
-const perfOrdersEl = document.getElementById("perf-orders");
-const perfCustomersEl = document.getElementById("perf-customers");
-const perfWowEl = document.getElementById("perf-wow");
-const perfMetaEl = document.getElementById("perf-meta");
 let currentRunId = null;
+let latestPerformancePayload = null;
 
 function runIdToConversationId(runId) {
   const numeric = Number(runId);
@@ -227,34 +224,10 @@ function showSingleAnalysis(payload, fileName = null) {
   }
 }
 
-function renderSidebarPerformance(payload) {
-  var summary = payload && payload.summary ? payload.summary : {};
-  if (perfRevenueEl) {
-    perfRevenueEl.textContent = "$" + Number(summary.total_revenue || 0).toLocaleString();
-  }
-  if (perfOrdersEl) {
-    perfOrdersEl.textContent = Number(summary.order_count || 0).toLocaleString();
-  }
-  if (perfCustomersEl) {
-    perfCustomersEl.textContent = Number(summary.customer_count || 0).toLocaleString();
-  }
-  if (perfWowEl) {
-    perfWowEl.textContent =
-      summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
-        ? "N/A"
-        : Number(summary.week_over_week_revenue_change_pct).toFixed(2) + "%";
-  }
-  if (perfMetaEl) {
-    var pointCount = Array.isArray(payload && payload.points) ? payload.points.length : 0;
-    perfMetaEl.textContent =
-      "Combined from " + String(pointCount) + " runs over " + String(payload.window_days || 7) + " days.";
-  }
-}
-
 async function loadSevenDayPerformance(showInWorkspace = true) {
   try {
     const payload = await fetchUserPerformance(7);
-    renderSidebarPerformance(payload);
+    latestPerformancePayload = payload;
     if (showInWorkspace) {
       currentRunId = null;
       resetFeed(feed);
@@ -269,6 +242,18 @@ async function loadSevenDayPerformance(showInWorkspace = true) {
     }
     setStatus(error.message || "Failed to load 7-day performance.", true);
   }
+}
+
+function showDefaultPerformanceWorkspace() {
+  if (latestPerformancePayload) {
+    currentRunId = null;
+    resetFeed(feed);
+    renderPerformanceDefault(feed, latestPerformancePayload);
+    feed.scrollTop = 0;
+    setStatus("Showing rolling 7-day store performance.");
+    return;
+  }
+  loadSevenDayPerformance(true);
 }
 
 async function loadHistory() {
@@ -461,6 +446,12 @@ if (shopifySyncBtn) {
     } finally {
       setShopifyButtonsDisabled(false);
     }
+  });
+}
+
+if (perfHomeBtn) {
+  perfHomeBtn.addEventListener("click", () => {
+    showDefaultPerformanceWorkspace();
   });
 }
 
