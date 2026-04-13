@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -11,6 +11,7 @@ class LeakFinding(BaseModel):
 	likely_why: str
 	what_to_do: str
 	evidence: List[str] = Field(default_factory=list)
+	context: Dict[str, float] = Field(default_factory=dict)
 
 
 class CohortRetentionPoint(BaseModel):
