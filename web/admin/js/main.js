@@ -121,36 +121,41 @@
     var height = canvas.height;
     ctx.clearRect(0, 0, width, height);
 
-    ctx.strokeStyle = "#d8d8d8";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, height - 24);
-    ctx.lineTo(width, height - 24);
-    ctx.stroke();
-
     if (!values || values.length === 0) {
       return;
     }
 
-    var min = Math.min.apply(null, values);
-    var max = Math.max.apply(null, values);
+    var min = Math.min(Math.min.apply(null, values), 0);
+    var max = Math.max(Math.max.apply(null, values), 0);
     var spread = max - min || 1;
-    var xStep = values.length > 1 ? (width - 12) / (values.length - 1) : 0;
+    var chartTop = 10;
+    var chartBottom = height - 10;
+    var chartHeight = chartBottom - chartTop;
 
-    ctx.strokeStyle = "#111111";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    for (var i = 0; i < values.length; i += 1) {
-      var x = 6 + xStep * i;
-      var y = height - 28 - ((values[i] - min) / spread) * (height - 48);
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
+    function yFor(value) {
+      return chartBottom - ((value - min) / spread) * chartHeight;
     }
+
+    var zeroY = yFor(0);
+
+    ctx.strokeStyle = "#d8d8d8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, zeroY);
+    ctx.lineTo(width, zeroY);
     ctx.stroke();
+
+    var slotWidth = (width - 12) / values.length;
+    var barWidth = Math.max(2, Math.min(10, slotWidth * 0.72));
+
+    ctx.fillStyle = "#111111";
+    for (var i = 0; i < values.length; i += 1) {
+      var x = 6 + i * slotWidth + (slotWidth - barWidth) / 2;
+      var y = yFor(values[i]);
+      var barTop = Math.min(y, zeroY);
+      var barHeight = Math.max(1, Math.abs(y - zeroY));
+      ctx.fillRect(x, barTop, barWidth, barHeight);
+    }
   }
 
   function requireAuthToken() {
