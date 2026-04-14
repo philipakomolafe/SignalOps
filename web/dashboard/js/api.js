@@ -9,6 +9,7 @@ const SHOPIFY_DISCONNECT_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/dis
 const SHOPIFY_MONITOR_NOW_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/monitor-now`;
 const ACCOUNT_PLAN_ENDPOINT = `${API_BASE}/api/v1/account/plan`;
 const USER_PERFORMANCE_ENDPOINT = `${API_BASE}/api/v1/srl/performance`;
+const ACTION_FEEDBACK_ENDPOINT = `${API_BASE}/api/v1/srl/action-feedback`;
 
 function authHeaders(extraHeaders = {}) {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -120,4 +121,17 @@ export async function fetchUserPerformance(days = 7) {
     headers: authHeaders(),
   });
   return parseResponse(response, "Failed to fetch performance data.");
+}
+
+export async function submitActionFeedback(actionTaken, actionDate, selfReportedOutcome) {
+  const response = await fetch(ACTION_FEEDBACK_ENDPOINT, {
+    method: "POST",
+    headers: authHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      action_taken: actionTaken,
+      action_date: actionDate,
+      self_reported_outcome: selfReportedOutcome,
+    }),
+  });
+  return parseResponse(response, "Failed to save action feedback.");
 }

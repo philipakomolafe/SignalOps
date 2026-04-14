@@ -39,6 +39,23 @@ class DiagnosisBlock(BaseModel):
 	what_changed: str
 	likely_why: str
 	what_to_do: str
+	what_to_watch_next: str = "Watch repeat rate, refund rate, and week-over-week revenue movement over the next 7 days."
+
+
+class ActionFeedbackCreateRequest(BaseModel):
+	action_taken: str = Field(min_length=5, max_length=500)
+	action_date: str = Field(min_length=8, max_length=64)
+	self_reported_outcome: str = Field(min_length=2, max_length=16)
+
+
+class ActionFeedbackItem(BaseModel):
+	action_feedback_id: int
+	action_taken: str
+	action_date: str
+	self_reported_outcome: str
+	impact_label: Optional[str] = None
+	impact_note: Optional[str] = None
+	created_at: str
 
 
 class AnalysisResponse(BaseModel):
@@ -209,6 +226,7 @@ class UserPerformanceResponse(BaseModel):
 	window_days: int = 7
 	points: List[FeatureTimeSeriesPoint] = Field(default_factory=list)
 	summary: UserPerformanceSummary
+	action_feedback: Optional[ActionFeedbackItem] = None
 
 
 class FlutterwaveInitializeRequest(BaseModel):

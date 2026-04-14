@@ -36,6 +36,7 @@ export function renderAnalysis(feed, payload) {
   diagnosisGrid.appendChild(diagnosis("What Changed", payload.diagnosis?.what_changed || "N/A"));
   diagnosisGrid.appendChild(diagnosis("Likely Why", payload.diagnosis?.likely_why || "N/A"));
   diagnosisGrid.appendChild(diagnosis("What To Do", payload.diagnosis?.what_to_do || "N/A"));
+  diagnosisGrid.appendChild(diagnosis("What To Watch Next", payload.diagnosis?.what_to_watch_next || "N/A"));
   wrapper.appendChild(diagnosisGrid);
 
   const features = payload.features || {};
@@ -113,6 +114,47 @@ export function renderPerformanceDefault(feed, payload) {
       `Combined from ${points} runs over ${payload && payload.window_days ? payload.window_days : 7} days.`
     )
   );
+
+  const feedback = payload && payload.action_feedback ? payload.action_feedback : null;
+  const feedbackBox = el("section", "diagnosis");
+  feedbackBox.appendChild(el("h4", "", "Action Feedback"));
+  if (feedback) {
+    const impactLabel = feedback.impact_label || "Pending";
+    feedbackBox.appendChild(
+      el(
+        "p",
+        "",
+        `<strong>Latest action:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> ${impactLabel}`
+      )
+    );
+    if (feedback.impact_note) {
+      feedbackBox.appendChild(el("p", "", feedback.impact_note));
+    }
+  } else {
+    feedbackBox.appendChild(el("p", "", "No action feedback yet. Add one to track before/after impact."));
+  }
+
+  feedbackBox.appendChild(
+    el(
+      "form",
+      "",
+      `
+        <label class="label" for="action-taken-input">What action did you take?</label>
+        <input id="action-taken-input" name="action_taken" type="text" maxlength="500" required />
+        <label class="label" for="action-date-input">When?</label>
+        <input id="action-date-input" name="action_date" type="date" required />
+        <label class="label" for="action-outcome-input">Did it help?</label>
+        <select id="action-outcome-input" name="self_reported_outcome" required>
+          <option value="yes">yes</option>
+          <option value="no">no</option>
+          <option value="unsure" selected>unsure</option>
+        </select>
+        <button id="action-feedback-submit" type="submit">Save Feedback</button>
+      `
+    )
+  );
+  feedbackBox.querySelector("form")?.setAttribute("id", "action-feedback-form");
+  wrapper.appendChild(feedbackBox);
 
   feed.appendChild(wrapper);
 }

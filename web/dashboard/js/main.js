@@ -10,6 +10,7 @@ import {
   logout,
   runShopifyMonitorNow,
   startShopifyConnect,
+  submitActionFeedback,
 } from "./api.js";
 import { TOKEN_STORAGE_KEY } from "./config.js";
 import { renderAnalysis, renderHistoryList, renderPerformanceDefault, renderUploadEvent, resetFeed } from "./render.js";
@@ -349,6 +350,42 @@ if (form) {
       setStatus(error.message || "Analysis failed.", true);
     } finally {
       setRunningState(false);
+    }
+  });
+}
+
+if (feed) {
+  feed.addEventListener("submit", async (event) => {
+    const formEl = event.target;
+    if (!(formEl instanceof HTMLFormElement)) return;
+    if (formEl.id !== "action-feedback-form") return;
+    event.preventDefault();
+
+    const actionTaken = String(formEl.action_taken?.value || "").trim();
+    const actionDate = String(formEl.action_date?.value || "").trim();
+    const outcome = String(formEl.self_reported_outcome?.value || "").trim().toLowerCase();
+
+    if (!actionTaken || !actionDate) {
+      setStatus("Please provide action and date.", true);
+      return;
+    }
+
+    const submitBtn = formEl.querySelector("#action-feedback-submit");
+    if (submitBtn) submitBtn.disabled = true;
+    setStatus("Saving action feedback...");
+    try {
+      await submitActionFeedback(actionTaken, actionDate, outcome);
+      await loadSevenDayPerformance(true);
+      setStatus("Action feedback saved. Impact will update as new runs come in.");
+    } catch (error) {
+      if (error.message === "AUTH_REQUIRED") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        redirectToLogin();
+        return;
+      }
+      setStatus(error.message || "Failed to save action feedback.", true);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   });
 }

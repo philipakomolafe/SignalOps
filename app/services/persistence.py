@@ -334,6 +334,26 @@ def init_storage() -> None:
                 ON billing_subscriptions (plan_code, updated_at DESC)
                 """,
             )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS action_feedback (
+                    action_feedback_id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    action_taken TEXT NOT NULL,
+                    action_date TIMESTAMPTZ NOT NULL,
+                    self_reported_outcome TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_action_feedback_user_date
+                ON action_feedback (user_id, action_date DESC)
+                """,
+            )
             connection.commit()
             return
 
@@ -531,6 +551,26 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_plan
             ON billing_subscriptions (plan_code, updated_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS action_feedback (
+                action_feedback_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action_taken TEXT NOT NULL,
+                action_date TEXT NOT NULL,
+                self_reported_outcome TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_action_feedback_user_date
+            ON action_feedback (user_id, action_date DESC)
             """,
         )
         connection.commit()
@@ -1460,6 +1500,84 @@ def get_user_feature_timeseries(user_id: int, window_days: int = 7) -> List[Dict
         )
 
     return points
+
+
+def save_action_feedback(
+    user_id: int,
+    action_taken: str,
+    action_date: str,
+    self_reported_outcome: str,
+) -> Dict[str, Any]:
+    """Save a user action feedback record for post-action impact tracking."""
+    safe_outcome = (self_reported_outcome or "").strip().lower()
+    with _connect() as connection:
+        if _is_postgres():
+            row = _execute(
+                connection,
+                """
+                INSERT INTO action_feedback (user_id, action_taken, action_date, self_reported_outcome)
+                VALUES (?, ?, ?, ?)
+                RETURNING action_feedback_id, user_id, action_taken, action_date, self_reported_outcome, created_at
+                """,
+                (user_id, action_taken.strip(), action_date.strip(), safe_outcome),
+            ).fetchone()
+            connection.commit()
+        else:
+            cursor = _execute(
+                connection,
+                """
+                INSERT INTO action_feedback (user_id, action_taken, action_date, self_reported_outcome)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, action_taken.strip(), action_date.strip(), safe_outcome),
+            )
+            row = _execute(
+                connection,
+                """
+                SELECT action_feedback_id, user_id, action_taken, action_date, self_reported_outcome, created_at
+                FROM action_feedback
+                WHERE action_feedback_id = ?
+                """,
+                (int(cursor.lastrowid),),
+            ).fetchone()
+            connection.commit()
+
+    return {
+        "action_feedback_id": int(row["action_feedback_id"]),
+        "user_id": int(row["user_id"]),
+        "action_taken": str(row["action_taken"]),
+        "action_date": str(row["action_date"]),
+        "self_reported_outcome": str(row["self_reported_outcome"]),
+        "created_at": str(row["created_at"]),
+    }
+
+
+def get_latest_action_feedback(user_id: int) -> Optional[Dict[str, Any]]:
+    """Return latest action feedback for user if one exists."""
+    with _connect() as connection:
+        row = _execute(
+            connection,
+            """
+            SELECT action_feedback_id, user_id, action_taken, action_date, self_reported_outcome, created_at
+            FROM action_feedback
+            WHERE user_id = ?
+            ORDER BY action_date DESC, action_feedback_id DESC
+            LIMIT 1
+            """,
+            (int(user_id),),
+        ).fetchone()
+
+    if not row:
+        return None
+
+    return {
+        "action_feedback_id": int(row["action_feedback_id"]),
+        "user_id": int(row["user_id"]),
+        "action_taken": str(row["action_taken"]),
+        "action_date": str(row["action_date"]),
+        "self_reported_outcome": str(row["self_reported_outcome"]),
+        "created_at": str(row["created_at"]),
+    }
 
 
 def _window_filter_sql(column: str, days: int) -> tuple[str, tuple[Any, ...]]:

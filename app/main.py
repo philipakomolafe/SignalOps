@@ -22,6 +22,8 @@ from app.configs.settings import settings
 # Typed request/response models used by auth and analysis endpoints.
 from app.models.schemas import (
     AccountPlanResponse,
+    ActionFeedbackCreateRequest,
+    ActionFeedbackItem,
     AdminFeatureTimeSeriesResponse,
     AuthUser,
     AnalysisHistoryItem,
@@ -70,6 +72,7 @@ from app.services.persistence import (
     get_user_by_id,
     get_user_by_email,
     get_user_by_session_hash,
+    get_latest_action_feedback,
     init_storage,
     list_analyses,
     list_active_shopify_connections,
@@ -80,6 +83,7 @@ from app.services.persistence import (
     save_payment_event,
     save_monitor_run,
     save_analysis,
+    save_action_feedback,
     get_founder_post_pack_metrics,
     upsert_billing_subscription,
     update_shopify_connection_tokens,
@@ -462,20 +466,164 @@ def _combine_feature_points(points: list[dict]) -> UserPerformanceSummary:
     )
 
 
+def _parse_iso_datetime(value: object) -> datetime | None:
+    """Parse ISO/date-like values into timezone-aware datetime when possible."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        try:
+            parsed = datetime.fromisoformat(f"{text}T00:00:00")
+        except ValueError:
+            return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _average_metric(points: list[dict], key: str) -> float | None:
+    """Return average metric for point set, or None when unavailable."""
+    values: list[float] = []
+    for point in points:
+        raw = point.get(key)
+        if raw is None:
+            continue
+        try:
+            values.append(float(raw))
+        except (TypeError, ValueError):
+            continue
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _compute_action_impact(user_id: int, action_date: datetime) -> tuple[str | None, str | None]:
+    """Compare 7-day before/after windows around action date and return impact label."""
+    points = get_user_feature_timeseries(user_id=user_id, window_days=30)
+    if not points:
+        return None, "No run data yet to assess impact."
+
+    before_start = action_date - timedelta(days=7)
+    after_end = action_date + timedelta(days=7)
+
+    before_points: list[dict] = []
+    after_points: list[dict] = []
+    for point in points:
+        point_ts = _parse_iso_datetime(point.get("timestamp"))
+        if not point_ts:
+            continue
+        if before_start <= point_ts < action_date:
+            before_points.append(point)
+        elif action_date <= point_ts <= after_end:
+            after_points.append(point)
+
+    if not before_points or not after_points:
+        return None, "Need both pre-action and post-action runs to label impact."
+
+    before_revenue = sum(float(point.get("total_revenue") or 0.0) for point in before_points)
+    after_revenue = sum(float(point.get("total_revenue") or 0.0) for point in after_points)
+    before_repeat = _average_metric(before_points, "repeat_rate")
+    after_repeat = _average_metric(after_points, "repeat_rate")
+    before_refund = _average_metric(before_points, "refund_rate")
+    after_refund = _average_metric(after_points, "refund_rate")
+
+    score = 0
+    if after_revenue > before_revenue * 1.03:
+        score += 1
+    elif after_revenue < before_revenue * 0.97:
+        score -= 1
+
+    if before_repeat is not None and after_repeat is not None:
+        if after_repeat > before_repeat + 0.2:
+            score += 1
+        elif after_repeat < before_repeat - 0.2:
+            score -= 1
+
+    if before_refund is not None and after_refund is not None:
+        if after_refund < before_refund - 0.2:
+            score += 1
+        elif after_refund > before_refund + 0.2:
+            score -= 1
+
+    if score >= 2:
+        label = "Improved"
+    elif score <= -1:
+        label = "Worsened"
+    else:
+        label = "No clear change"
+
+    note = (
+        f"Compared 7-day windows around action date: revenue {before_revenue:.2f} -> {after_revenue:.2f}."
+    )
+    return label, note
+
+
+def _build_action_feedback_item(user_id: int, row: dict | None) -> ActionFeedbackItem | None:
+    """Build response model for latest action feedback including computed impact label."""
+    if not row:
+        return None
+
+    action_date_text = str(row.get("action_date") or "").strip()
+    action_date = _parse_iso_datetime(action_date_text)
+    impact_label, impact_note = (None, "Action date could not be parsed for impact comparison.")
+    if action_date is not None:
+        impact_label, impact_note = _compute_action_impact(user_id=user_id, action_date=action_date)
+
+    return ActionFeedbackItem(
+        action_feedback_id=int(row["action_feedback_id"]),
+        action_taken=str(row.get("action_taken") or ""),
+        action_date=action_date_text,
+        self_reported_outcome=str(row.get("self_reported_outcome") or "").lower(),
+        impact_label=impact_label,
+        impact_note=impact_note,
+        created_at=str(row.get("created_at") or ""),
+    )
+
+
 @app.get("/api/v1/srl/performance", response_model=UserPerformanceResponse)
 def user_performance(
     days: int = Query(default=7, ge=1, le=30),
     current_user: dict = Depends(get_current_user),
 ) -> UserPerformanceResponse:
     """Return user-scoped rolling-window performance for default dashboard business view."""
-    points = get_user_feature_timeseries(user_id=int(current_user["user_id"]), window_days=days)
+    user_id = int(current_user["user_id"])
+    points = get_user_feature_timeseries(user_id=user_id, window_days=days)
     summary = _combine_feature_points(points)
+    feedback = _build_action_feedback_item(user_id=user_id, row=get_latest_action_feedback(user_id))
     return UserPerformanceResponse(
         generated_at=datetime.now(timezone.utc).isoformat(),
         window_days=days,
         points=points,
         summary=summary,
+        action_feedback=feedback,
     )
+
+
+@app.post("/api/v1/srl/action-feedback", response_model=ActionFeedbackItem)
+def submit_action_feedback(
+    payload: ActionFeedbackCreateRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ActionFeedbackItem:
+    """Store user action feedback and return latest impact label summary."""
+    outcome = str(payload.self_reported_outcome or "").strip().lower()
+    if outcome not in {"yes", "no", "unsure"}:
+        raise HTTPException(status_code=400, detail="self_reported_outcome must be yes, no, or unsure")
+
+    user_id = int(current_user["user_id"])
+    saved = save_action_feedback(
+        user_id=user_id,
+        action_taken=payload.action_taken,
+        action_date=payload.action_date,
+        self_reported_outcome=outcome,
+    )
+    built = _build_action_feedback_item(user_id=user_id, row=saved)
+    if not built:
+        raise HTTPException(status_code=500, detail="Failed to save action feedback")
+    return built
 
 
 @app.post("/api/v1/payments/flutterwave/webhook")

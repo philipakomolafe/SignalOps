@@ -109,6 +109,21 @@ def _compose_what_to_do(findings: List[LeakFinding]) -> str:
     return "; ".join(actions) + "."
 
 
+def _compose_what_to_watch_next(findings: List[LeakFinding]) -> str:
+    watches: List[str] = []
+    if any(item.id == "revenue_velocity_drop" for item in findings):
+        watches.append("week-over-week revenue")
+    if any(item.id in {"repeat_rate_decline", "purchase_interval_expansion"} for item in findings):
+        watches.append("repeat rate and purchase interval")
+    if any(item.id == "refund_rate_spike" for item in findings):
+        watches.append("refund rate by top SKUs")
+
+    if not watches:
+        return "Watch repeat rate, refund rate, and week-over-week revenue movement over the next 7 days."
+
+    return "Over the next 7 days, track " + "; ".join(watches) + " to confirm whether actions are working."
+
+
 def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tuple[str, DiagnosisBlock]:
     logger.info("Building report for %s finding(s)", len(findings))
     if findings:
@@ -118,6 +133,7 @@ def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tupl
             what_changed=_compose_what_changed(ordered, features),
             likely_why=_compose_likely_why(ordered, features),
             what_to_do=_compose_what_to_do(ordered),
+            what_to_watch_next=_compose_what_to_watch_next(ordered),
         )
         logger.info("Report built with primary finding: %s", ordered[0].id)
         return summary, diagnosis
@@ -134,6 +150,7 @@ def build_report(features: FeatureSnapshot, findings: List[LeakFinding]) -> Tupl
         ),
         likely_why="Customer and purchase pattern variance remains within expected range.",
         what_to_do="Keep feeding fresh order data weekly and tune thresholds as signal quality improves.",
+        what_to_watch_next="Watch repeat rate, refund rate, and week-over-week revenue movement over the next 7 days.",
     )
     logger.info("Report built with no critical leak detected")
     return summary, diagnosis
