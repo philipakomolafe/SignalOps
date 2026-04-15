@@ -13,6 +13,17 @@ function diagnosis(label, body) {
   return el("article", "diagnosis", `<span class="label">${label}</span><p>${body}</p>`);
 }
 
+function disclosure(title, subtitle = "") {
+  const details = el("details", "disclosure");
+  const summary = el("summary", "");
+  summary.appendChild(el("span", "disclosure-title", title));
+  if (subtitle) {
+    summary.appendChild(el("span", "disclosure-subtitle", subtitle));
+  }
+  details.appendChild(summary);
+  return details;
+}
+
 export function renderUploadEvent(feed, fileName) {
   const msg = el("article", "feed-message user", `<p>Uploaded <strong>${fileName}</strong>. Run SignalOPs diagnosis.</p>`);
   feed.appendChild(msg);
@@ -37,7 +48,9 @@ export function renderAnalysis(feed, payload) {
   diagnosisGrid.appendChild(diagnosis("Likely Why", payload.diagnosis?.likely_why || "N/A"));
   diagnosisGrid.appendChild(diagnosis("What To Do", payload.diagnosis?.what_to_do || "N/A"));
   diagnosisGrid.appendChild(diagnosis("What To Watch Next", payload.diagnosis?.what_to_watch_next || "N/A"));
-  wrapper.appendChild(diagnosisGrid);
+  const diagnosisDisclosure = disclosure("Detailed diagnosis", "Expand for full narrative");
+  diagnosisDisclosure.appendChild(diagnosisGrid);
+  wrapper.appendChild(diagnosisDisclosure);
 
   const features = payload.features || {};
   const metricsGrid = el("div", "metrics-grid");
@@ -54,10 +67,6 @@ export function renderAnalysis(feed, payload) {
   ));
   wrapper.appendChild(metricsGrid);
 
-  const findingsTitle = el("h3", "", "Leak Findings");
-  findingsTitle.style.marginTop = "0.75rem";
-  wrapper.appendChild(findingsTitle);
-
   const findingsGrid = el("div", "findings-grid");
   const findings = Array.isArray(payload.findings) ? payload.findings : [];
   if (findings.length === 0) {
@@ -73,7 +82,13 @@ export function renderAnalysis(feed, payload) {
       );
     });
   }
-  wrapper.appendChild(findingsGrid);
+
+  const findingsDisclosure = disclosure(
+    "Leak findings",
+    findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "No critical leaks"
+  );
+  findingsDisclosure.appendChild(findingsGrid);
+  wrapper.appendChild(findingsDisclosure);
 
   feed.appendChild(wrapper);
 }
@@ -116,15 +131,16 @@ export function renderPerformanceDefault(feed, payload) {
   );
 
   const feedback = payload && payload.action_feedback ? payload.action_feedback : null;
-  const feedbackBox = el("section", "diagnosis");
-  feedbackBox.appendChild(el("h4", "", "Action Feedback"));
+  const feedbackState = feedback?.impact_label || (feedback ? "Pending" : "Not started");
+  const feedbackDisclosure = disclosure("Action feedback", `Status: ${feedbackState}`);
+  const feedbackBox = el("section", "feedback-panel");
   if (feedback) {
     const impactLabel = feedback.impact_label || "Pending";
     feedbackBox.appendChild(
       el(
         "p",
-        "",
-        `<strong>Latest action:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> ${impactLabel}`
+        "feedback-inline-meta",
+        `<strong>Latest action:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> <span class="impact-chip">${impactLabel}</span>`
       )
     );
     if (feedback.impact_note) {
@@ -133,7 +149,8 @@ export function renderPerformanceDefault(feed, payload) {
   } else {
     feedbackBox.appendChild(el("p", "", "No action feedback yet. Add one to track before/after impact."));
   }
-
+  feedbackDisclosure.appendChild(feedbackBox);
+  wrapper.appendChild(feedbackDisclosure);
   feedbackBox.appendChild(
     el(
       "form",

@@ -344,6 +344,51 @@
   line-height: 1.45;
 }
 
+.disclosure {
+  margin-top: 0.7rem;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  background: #fbfdff;
+  overflow: hidden;
+}
+
+.disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f5f8fc;
+  border-bottom: 1px solid transparent;
+}
+
+.disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure[open] > summary {
+  border-bottom-color: #d7deea;
+}
+
+.disclosure-title {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1f2a3a;
+  letter-spacing: 0.01em;
+}
+
+.disclosure-subtitle {
+  font-size: 0.72rem;
+  color: #607086;
+}
+
+.disclosure > :not(summary) {
+  padding: 0 10px 10px;
+}
+
 .findings-grid,
 .metrics-grid,
 .diagnosis-grid {
@@ -358,6 +403,11 @@
 
 .diagnosis-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.disclosure .diagnosis-grid,
+.disclosure .findings-grid {
+  margin-top: 8px;
 }
 
 .metric,
@@ -424,6 +474,81 @@
   font-weight: 700;
   line-height: 1.2;
   margin-bottom: 0.18rem;
+}
+
+.feedback-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.feedback-inline-meta {
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.impact-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid #cfd9eb;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #f3f7ff;
+  color: #1f355f;
+}
+
+#action-feedback-form {
+  display: grid;
+  gap: 7px;
+  border-top: 1px dashed #d5dce8;
+  padding-top: 8px;
+}
+
+#action-feedback-form .label {
+  font-size: 0.72rem;
+  color: #4f5d71;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+#action-feedback-form input,
+#action-feedback-form select {
+  width: 100%;
+  border: 1px solid #ced8e6;
+  border-radius: 8px;
+  padding: 0.4rem 0.48rem;
+  font-size: 0.82rem;
+  color: #1f2937;
+  background: #fff;
+}
+
+#action-feedback-form input:focus,
+#action-feedback-form select:focus {
+  outline: 2px solid #d7e4ff;
+  outline-offset: 1px;
+}
+
+#action-feedback-submit {
+  width: fit-content;
+  border: 1px solid #c4d3ee;
+  border-radius: 999px;
+  padding: 0.38rem 0.8rem;
+  background: #edf3ff;
+  color: #1f355f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#action-feedback-submit:hover {
+  background: #e4ecfb;
+}
+
+#action-feedback-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .upload-form {
@@ -640,6 +765,15 @@
   .metrics-grid,
   .diagnosis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .disclosure > summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #action-feedback-submit {
+    width: 100%;
   }
 
   .run-btn {
