@@ -9,13 +9,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Security, UploadFile
 # CORS middleware allows browser clients from configured origins to call the API.
 from fastapi.middleware.cors import CORSMiddleware
 # RedirectResponse is used for canonical URL redirects and root redirects.
 from fastapi.responses import RedirectResponse
 # StaticFiles serves frontend assets (dashboard, login, landing pages).
 from fastapi.staticfiles import StaticFiles
+# Make use of FastAPI's HTTPBearer security scheme for auth token extraction in docs.
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 # App-level runtime settings (app name/version/cors config).
 from app.configs.settings import settings
@@ -51,7 +53,6 @@ from app.services.ingestion import CSVNormalizationError, normalize_orders_csv, 
 from app.services.leak_engine import detect_leaks
 # Auth utility helpers to keep this module focused on API orchestration.
 from app.services.auth_utils import (
-    extract_bearer_token,
     hash_password,
     hash_token,
     mask_email,
@@ -138,6 +139,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# HTTPBearer instance for extracting Bearer tokens in API endpoints and docs.
+security = HTTPBearer()
+
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -205,13 +209,10 @@ if WEB_ROOT.exists():
     app.mount("/admin", StaticFiles(directory=WEB_ROOT / "admin", html=True), name="admin")
 
 
-def get_current_user(authorization: str | None = Header(default=None)) -> dict:
+def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """Dependency that resolves currently authenticated user from bearer token."""
-    # Pull raw token from Authorization header.
-    try:
-        token = extract_bearer_token(authorization)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    # Pull raw token from FastAPI's bearer security dependency.
+    token = credentials.credentials
     # Lookup user by hashed token in active sessions.
     user = get_user_by_session_hash(hash_token(token))
     # Missing user means invalid or revoked/expired session.
@@ -786,13 +787,10 @@ def me(current_user: dict = Depends(get_current_user)) -> AuthUser:
 
 
 @app.post("/api/v1/auth/logout")
-def logout(authorization: str | None = Header(default=None)) -> dict:
+def logout(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """Revoke current session token."""
-    # Parse bearer token from Authorization header.
-    try:
-        token = extract_bearer_token(authorization)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    # Parse bearer token from FastAPI's security dependency.
+    token = credentials.credentials
     # Remove token hash from session store.
     revoke_session(hash_token(token))
     logger.info("Logout completed")
