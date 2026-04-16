@@ -171,7 +171,6 @@ export function renderPerformanceDefault(feed, payload) {
     )
   );
   feedbackBox.querySelector("form")?.setAttribute("id", "action-feedback-form");
-  wrapper.appendChild(feedbackBox);
 
   feed.appendChild(wrapper);
 }

@@ -209,6 +209,7 @@ if WEB_ROOT.exists():
     app.mount("/admin", StaticFiles(directory=WEB_ROOT / "admin", html=True), name="admin")
 
 
+# TODO : Next time I have the fastapi docs schema security figured out.
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """Dependency that resolves currently authenticated user from bearer token."""
     # Pull raw token from FastAPI's bearer security dependency.
@@ -218,7 +219,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     # Missing user means invalid or revoked/expired session.
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    # Return user dict for endpoint dependency injection.
+    
     return user
 
 

@@ -1,3 +1,16 @@
+"""
+Module for Flutterwave payment processing integration.
+This module provides functions to interact with the Flutterwave payment API,
+including webhook signature validation, transaction verification, subscription
+payment initialization, and transaction reference management.
+The transaction reference (tx_ref) format uses a custom encoding scheme:
+- Format: "so:{user_id}:{plan_code}:{timestamp}"
+- The "so" prefix is a namespace identifier for SignalOps
+- It enables robust webhook attribution by embedding user identity
+- The timestamp provides transaction uniqueness and chronological tracking
+"""
+
+
 import base64
 import hashlib
 import hmac
@@ -74,7 +87,7 @@ def parse_tx_ref_user_id(tx_ref: str | None) -> int | None:
         return None
 
     parts = value.split(":")
-    if len(parts) < 3 or parts[0] != "so":
+    if len(parts) <= 3 or parts[0] != "so":
         return None
 
     try:
