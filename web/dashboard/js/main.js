@@ -13,10 +13,16 @@ import {
   submitActionFeedback,
 } from "./api.js";
 import { TOKEN_STORAGE_KEY } from "./config.js";
-import { renderAnalysis, renderHistoryList, renderPerformanceDefault, renderUploadEvent, resetFeed } from "./render.js";
+import {
+  renderAnalysis,
+  renderHistoryList,
+  renderSidebarActionFeedback,
+  renderSidebarPerformance,
+  renderUploadEvent,
+  resetFeed,
+} from "./render.js";
 
 const feed = document.getElementById("analysis-feed");
-const empty = document.getElementById("feed-empty");
 const form = document.getElementById("upload-form");
 const fileInput = document.getElementById("csv-file");
 const dropZone = document.getElementById("drop-zone");
@@ -28,15 +34,26 @@ const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
 const sidebarUserEl = document.querySelector(".sidebar-user");
 const logoutBtn = document.getElementById("logout-btn");
+
 const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
-const perfHomeBtn = document.getElementById("perf-home-btn");
+
+const sidebarPerformanceContentEl = document.getElementById("sidebar-performance-content");
+const sidebarFeedbackContentEl = document.getElementById("sidebar-feedback-content");
+const sidebarHistorySectionEl = document.getElementById("sidebar-history-section");
+const sidebarPerformanceSectionEl = document.getElementById("sidebar-performance-section");
+const sidebarFeedbackSectionEl = document.getElementById("sidebar-feedback-section");
+const sidebarNavEls = Array.from(document.querySelectorAll(".sidebar-nav-item"));
 const planPillEl = document.getElementById("plan-pill");
 const upgradeLinkEl = document.getElementById("upgrade-link");
-const billingNoteEl = document.getElementById("billing-note");
+
+const openSettingsBtn = document.getElementById("open-settings-btn");
+const settingsModalEl = document.getElementById("settings-modal");
+const settingsCloseBtn = document.getElementById("settings-close-btn");
+
 let currentRunId = null;
 let latestPerformancePayload = null;
 
@@ -87,21 +104,6 @@ function setStatus(message, isError = false) {
   statusEl.classList.toggle("error", isError);
 }
 
-function setBillingNote(message, state = "pending") {
-  if (!billingNoteEl) return;
-  if (!message) {
-    billingNoteEl.hidden = true;
-    billingNoteEl.textContent = "";
-    billingNoteEl.classList.remove("is-success", "is-pending");
-    return;
-  }
-
-  billingNoteEl.hidden = false;
-  billingNoteEl.textContent = message;
-  billingNoteEl.classList.remove("is-success", "is-pending");
-  billingNoteEl.classList.add(state === "success" ? "is-success" : "is-pending");
-}
-
 function formatPlanLabel(planCode, isAdmin) {
   if (isAdmin) return "Admin";
   const safe = String(planCode || "free").toLowerCase();
@@ -144,20 +146,6 @@ async function loadAccountPlanAndBillingUi() {
   }
 }
 
-function applyBillingReturnHint() {
-  const params = new URLSearchParams(window.location.search);
-  const billing = (params.get("billing") || "").trim().toLowerCase();
-  if (billing === "activated") {
-    setBillingNote("Subscription active. Premium tools are now unlocked.", "success");
-    return;
-  }
-  if (billing === "pending") {
-    setBillingNote("Payment submitted. Your plan usually updates within a few moments.", "pending");
-    return;
-  }
-  setBillingNote("");
-}
-
 function pickFile(file) {
   if (!fileInput || !file) return;
   if (!file.name.toLowerCase().endsWith(".csv")) {
@@ -186,6 +174,41 @@ function setShopifyButtonsDisabled(disabled) {
   [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn].forEach((button) => {
     if (button) button.disabled = disabled;
   });
+}
+
+function switchSidebarSection(sectionName) {
+  const next = String(sectionName || "history").toLowerCase();
+  const sectionMap = {
+    history: sidebarHistorySectionEl,
+    performance: sidebarPerformanceSectionEl,
+    feedback: sidebarFeedbackSectionEl,
+  };
+
+  Object.entries(sectionMap).forEach(([key, section]) => {
+    if (!section) return;
+    section.hidden = key !== next;
+  });
+
+  sidebarNavEls.forEach((button) => {
+    const isActive = button.getAttribute("data-section") === next;
+    button.classList.toggle("active", isActive);
+  });
+}
+
+function renderSidebarInsights() {
+  if (!latestPerformancePayload) return;
+  renderSidebarPerformance(sidebarPerformanceContentEl, latestPerformancePayload);
+  renderSidebarActionFeedback(sidebarFeedbackContentEl, latestPerformancePayload);
+}
+
+function openSettingsModal() {
+  if (!settingsModalEl) return;
+  settingsModalEl.hidden = false;
+}
+
+function closeSettingsModal() {
+  if (!settingsModalEl) return;
+  settingsModalEl.hidden = true;
 }
 
 async function loadShopifyStatus() {
@@ -225,16 +248,11 @@ function showSingleAnalysis(payload, fileName = null) {
   }
 }
 
-async function loadSevenDayPerformance(showInWorkspace = true) {
+async function loadSevenDayPerformance() {
   try {
     const payload = await fetchUserPerformance(7);
     latestPerformancePayload = payload;
-    if (showInWorkspace) {
-      currentRunId = null;
-      resetFeed(feed);
-      renderPerformanceDefault(feed, payload);
-      feed.scrollTop = 0;
-    }
+    renderSidebarInsights();
   } catch (error) {
     if (error.message === "AUTH_REQUIRED") {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -243,18 +261,6 @@ async function loadSevenDayPerformance(showInWorkspace = true) {
     }
     setStatus(error.message || "Failed to load 7-day performance.", true);
   }
-}
-
-function showDefaultPerformanceWorkspace() {
-  if (latestPerformancePayload) {
-    currentRunId = null;
-    resetFeed(feed);
-    renderPerformanceDefault(feed, latestPerformancePayload);
-    feed.scrollTop = 0;
-    setStatus("Showing rolling 7-day store performance.");
-    return;
-  }
-  loadSevenDayPerformance(true);
 }
 
 async function loadHistory() {
@@ -340,7 +346,7 @@ if (form) {
         setStatus("Analysis complete.");
       }
       await loadHistory();
-      await loadSevenDayPerformance(false);
+      await loadSevenDayPerformance();
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -354,8 +360,8 @@ if (form) {
   });
 }
 
-if (feed) {
-  feed.addEventListener("submit", async (event) => {
+if (sidebarFeedbackContentEl) {
+  sidebarFeedbackContentEl.addEventListener("submit", async (event) => {
     const formEl = event.target;
     if (!(formEl instanceof HTMLFormElement)) return;
     if (formEl.id !== "action-feedback-form") return;
@@ -372,10 +378,11 @@ if (feed) {
 
     const submitBtn = formEl.querySelector("#action-feedback-submit");
     if (submitBtn) submitBtn.disabled = true;
+
     setStatus("Saving action feedback...");
     try {
       await submitActionFeedback(actionTaken, actionDate, outcome);
-      await loadSevenDayPerformance(true);
+      await loadSevenDayPerformance();
       setStatus("Action feedback saved. Impact will update as new runs come in.");
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
@@ -472,7 +479,7 @@ if (shopifySyncBtn) {
       setShopifyStatus(`Monitor complete. Analyses: ${result.triggered_analyses}.`);
       await loadHistory();
       await loadShopifyStatus();
-      await loadSevenDayPerformance(false);
+      await loadSevenDayPerformance();
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -486,9 +493,12 @@ if (shopifySyncBtn) {
   });
 }
 
-if (perfHomeBtn) {
-  perfHomeBtn.addEventListener("click", () => {
-    showDefaultPerformanceWorkspace();
+if (sidebarNavEls.length) {
+  sidebarNavEls.forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = button.getAttribute("data-section") || "history";
+      switchSidebarSection(target);
+    });
   });
 }
 
@@ -512,6 +522,32 @@ if (userToggleBtn && userActionsEl) {
   });
 }
 
+if (openSettingsBtn) {
+  openSettingsBtn.addEventListener("click", () => {
+    if (userActionsEl) userActionsEl.hidden = true;
+    if (userToggleBtn) userToggleBtn.setAttribute("aria-expanded", "false");
+    openSettingsModal();
+  });
+}
+
+if (settingsCloseBtn) {
+  settingsCloseBtn.addEventListener("click", closeSettingsModal);
+}
+
+if (settingsModalEl) {
+  settingsModalEl.addEventListener("click", (event) => {
+    if (event.target === settingsModalEl) {
+      closeSettingsModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeSettingsModal();
+    }
+  });
+}
+
 async function bootstrap() {
   const token = requireAuthToken();
   if (!token) {
@@ -524,11 +560,12 @@ async function bootstrap() {
       const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
       userNameEl.textContent = me.full_name || fallbackName;
     }
-    await loadSevenDayPerformance(true);
+
+    switchSidebarSection("history");
+    await loadSevenDayPerformance();
     await loadHistory();
     await loadShopifyStatus();
     await loadAccountPlanAndBillingUi();
-    applyBillingReturnHint();
 
     const conversationId = readConversationIdFromHash();
     if (conversationId) {
@@ -543,7 +580,7 @@ async function bootstrap() {
         }
       }
     }
-  } catch (error) {
+  } catch (_error) {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     redirectToLogin();
   }

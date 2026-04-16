@@ -175,6 +175,77 @@ export function renderPerformanceDefault(feed, payload) {
   feed.appendChild(wrapper);
 }
 
+export function renderSidebarPerformance(container, payload) {
+  if (!container) return;
+
+  const summary = payload && payload.summary ? payload.summary : {};
+  const points = Array.isArray(payload && payload.points) ? payload.points.length : 0;
+
+  container.innerHTML = "";
+  const list = el("dl", "sidebar-kv-list");
+  list.appendChild(el("div", "sidebar-kv-item", `<dt>Revenue</dt><dd>$${Number(summary.total_revenue || 0).toLocaleString()}</dd>`));
+  list.appendChild(el("div", "sidebar-kv-item", `<dt>Orders</dt><dd>${Number(summary.order_count || 0).toLocaleString()}</dd>`));
+  list.appendChild(el("div", "sidebar-kv-item", `<dt>Customers</dt><dd>${Number(summary.customer_count || 0).toLocaleString()}</dd>`));
+  list.appendChild(
+    el(
+      "div",
+      "sidebar-kv-item",
+      `<dt>WoW</dt><dd>${summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
+        ? "N/A"
+        : `${Number(summary.week_over_week_revenue_change_pct).toFixed(2)}%`}</dd>`
+    )
+  );
+  container.appendChild(list);
+  container.appendChild(el("p", "sidebar-note", `${points} run${points === 1 ? "" : "s"} in last ${payload && payload.window_days ? payload.window_days : 7} days.`));
+}
+
+export function renderSidebarActionFeedback(container, payload) {
+  if (!container) return;
+
+  const feedback = payload && payload.action_feedback ? payload.action_feedback : null;
+  const status = feedback?.impact_label || (feedback ? "Pending" : "Not started");
+
+  container.innerHTML = "";
+  container.appendChild(el("p", "sidebar-note", `Status: ${status}`));
+
+  if (feedback) {
+    const impactLabel = feedback.impact_label || "Pending";
+    container.appendChild(
+      el(
+        "p",
+        "feedback-inline-meta",
+        `<strong>Latest:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> <span class="impact-chip">${impactLabel}</span>`
+      )
+    );
+    if (feedback.impact_note) {
+      container.appendChild(el("p", "sidebar-note", feedback.impact_note));
+    }
+  } else {
+    container.appendChild(el("p", "sidebar-note", "No action feedback yet."));
+  }
+
+  container.appendChild(
+    el(
+      "form",
+      "sidebar-feedback-form",
+      `
+        <label class="label" for="action-taken-input">What action?</label>
+        <input id="action-taken-input" name="action_taken" type="text" maxlength="500" required />
+        <label class="label" for="action-date-input">When?</label>
+        <input id="action-date-input" name="action_date" type="date" required />
+        <label class="label" for="action-outcome-input">Did it help?</label>
+        <select id="action-outcome-input" name="self_reported_outcome" required>
+          <option value="yes">yes</option>
+          <option value="no">no</option>
+          <option value="unsure" selected>unsure</option>
+        </select>
+        <button id="action-feedback-submit" type="submit">Save</button>
+      `
+    )
+  );
+  container.querySelector("form")?.setAttribute("id", "action-feedback-form");
+}
+
 export function clearEmptyState(feed, empty) {
   if (empty && feed.contains(empty)) {
     feed.removeChild(empty);

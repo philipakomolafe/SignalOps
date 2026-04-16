@@ -29,6 +29,7 @@
   grid-template-rows: auto 1fr auto;
   box-shadow: var(--shadow);
   min-height: calc(100vh - 28px);
+  position: relative;
 }
 
 .workspace-top {

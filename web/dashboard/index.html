@@ -24,23 +24,47 @@
           <img src="/assets/logo.png" alt="SignalOPs logo" class="brand-logo" />
           <span>SignalOPs</span>
         </div>
-        <p class="brand-sub">Silent Revenue Leaks</p>
+        <p class="brand-sub">CSV-first analysis workspace</p>
       </div>
 
-      <div class="sidebar-block">
-        <h3>Target Segment</h3>
-        <p>Shopify stores doing $5k-$25k monthly revenue.</p>
-      </div>
+      <nav class="sidebar-nav" aria-label="Workspace sections">
+        <button id="nav-history" class="sidebar-nav-item active" type="button" data-section="history">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h16v2H4zM4 11h10v2H4zM4 17h16v2H4z"></path>
+          </svg>
+          <span>Runs</span>
+        </button>
+        <button id="nav-performance" class="sidebar-nav-item" type="button" data-section="performance">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 18h18v2H3zM6 10h3v6H6zM11 6h3v10h-3zM16 12h3v4h-3z"></path>
+          </svg>
+          <span>Store</span>
+        </button>
+        <button id="nav-feedback" class="sidebar-nav-item" type="button" data-section="feedback">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 4h16v12H7l-3 3V4zm3 4h10v2H7zm0 4h7v2H7z"></path>
+          </svg>
+          <span>Action</span>
+        </button>
+      </nav>
 
-      <div class="sidebar-block history-block">
-        <h3>Recent Analyses</h3>
-        <ul id="history-list" class="history-list">
-          <li class="history-empty">No saved analyses yet.</li>
-        </ul>
-      </div>
+      <div class="sidebar-sections">
+        <section id="sidebar-history-section" class="sidebar-section">
+          <h3>Runs</h3>
+          <ul id="history-list" class="history-list">
+            <li class="history-empty">No saved analyses yet.</li>
+          </ul>
+        </section>
 
-      <div class="sidebar-block perf-block">
-        <button id="perf-home-btn" class="perf-home-btn" type="button">7-Day Store Performance</button>
+        <section id="sidebar-performance-section" class="sidebar-section" hidden>
+          <h3>Store</h3>
+          <div id="sidebar-performance-content"></div>
+        </section>
+
+        <section id="sidebar-feedback-section" class="sidebar-section" hidden>
+          <h3>Action</h3>
+          <div id="sidebar-feedback-content"></div>
+        </section>
       </div>
 
       <div class="sidebar-user">
@@ -49,17 +73,7 @@
           <span id="user-name">User</span>
         </button>
         <div id="user-actions" class="user-actions" hidden>
-          <section class="settings-stack" aria-label="Integration settings">
-            <h4>Settings</h4>
-            <label class="settings-label" for="shop-domain-input">Shopify store</label>
-            <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
-            <div class="settings-actions-row">
-              <button id="shopify-connect-btn" type="button">Connect</button>
-              <button id="shopify-disconnect-btn" type="button">Disconnect</button>
-            </div>
-            <button id="shopify-sync-btn" type="button">Sync Now</button>
-            <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
-          </section>
+          <button id="open-settings-btn" type="button">Settings</button>
           <button id="logout-btn" type="button">Log out</button>
         </div>
       </div>
@@ -74,10 +88,9 @@
       <header class="workspace-top">
         <div class="workspace-title">
           <h1>Analysis Workspace</h1>
-          <p>Drop a CSV and SignalOPs will generate diagnosis in this panel.</p>
+          <p>Drop a CSV to generate analysis. This panel only shows analysis outputs.</p>
         </div>
       </header>
-      <section class="billing-note" id="billing-note" hidden aria-live="polite"></section>
 
       <section id="analysis-feed" class="analysis-feed" aria-live="polite">
         <article class="feed-empty" id="feed-empty">
@@ -98,6 +111,26 @@
         <p id="status" class="status"></p>
       </section>
     </main>
+  </div>
+
+  <div id="settings-modal" class="settings-modal" hidden>
+    <div class="settings-modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+      <header class="settings-modal-head">
+        <h2 id="settings-modal-title">Settings</h2>
+        <button id="settings-close-btn" class="settings-close-btn" type="button" aria-label="Close settings">Close</button>
+      </header>
+      <section class="settings-stack" aria-label="Integration settings">
+        <h4>Shopify setup</h4>
+        <label class="settings-label" for="shop-domain-input">Shopify store</label>
+        <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
+        <div class="settings-actions-row">
+          <button id="shopify-connect-btn" type="button">Connect</button>
+          <button id="shopify-disconnect-btn" type="button">Disconnect</button>
+        </div>
+        <button id="shopify-sync-btn" type="button">Sync now</button>
+        <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
+      </section>
+    </div>
   </div>
 
   <script>
