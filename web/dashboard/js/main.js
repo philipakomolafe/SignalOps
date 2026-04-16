@@ -498,6 +498,9 @@ if (sidebarNavEls.length) {
     button.addEventListener("click", () => {
       const target = button.getAttribute("data-section") || "history";
       switchSidebarSection(target);
+      if (target === "history") setStatus("Showing recent analysis runs.");
+      if (target === "performance") setStatus("Showing 7-day store performance.");
+      if (target === "feedback") setStatus("Showing action feedback.");
     });
   });
 }

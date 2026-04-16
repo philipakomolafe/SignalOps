@@ -74,6 +74,10 @@
   gap: 6px;
 }
 
+.sidebar-section[hidden] {
+  display: none;
+}
+
 .sidebar-section h3 {
   font-family: "Manrope", sans-serif;
   font-size: 0.78rem;
