@@ -19,14 +19,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ADMIN_EMAILS", "ADMIN_EMAIL"),
     )
     app_public_base_url: str = "http://127.0.0.1:8000"
-    auth_reset_token_ttl_minutes: int = Field(
-        default=30,
-        validation_alias=AliasChoices("AUTH_RESET_TOKEN_TTL_MINUTES"),
-    )
-    auth_expose_reset_token_for_dev: bool = Field(
-        default=True,
-        validation_alias=AliasChoices("AUTH_EXPOSE_RESET_TOKEN_FOR_DEV"),
-    )
     monitor_internal_token: str = Field(
         default="",
         validation_alias=AliasChoices("MONITOR_INTERNAL_TOKEN"),
@@ -92,6 +84,18 @@ class Settings(BaseSettings):
     billing_pro_amount: float = Field(
         default=99.0,
         validation_alias=AliasChoices("BILLING_PRO_AMOUNT"),
+    )
+    resend_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("RESEND_API_KEY"),
+    )
+    resend_from_email: str = Field(
+        default="",
+        validation_alias=AliasChoices("RESEND_FROM_EMAIL"),
+    )
+    password_reset_token_ttl_minutes: int = Field(
+        default=20,
+        validation_alias=AliasChoices("PASSWORD_RESET_TOKEN_TTL_MINUTES"),
     )
     retention_monitor_runs_days: int = Field(
         default=30,

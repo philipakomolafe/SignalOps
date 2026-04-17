@@ -37,7 +37,9 @@
           <label for="signin-password">Password</label>
           <input id="signin-password" name="password" type="password" minlength="8" autocomplete="current-password" required />
 
-          <button id="forgot-password-link" class="link-btn" type="button">Forgot password?</button>
+          <p class="helper-link-row">
+            <a id="forgot-password-link" href="/login/forgot/">Forgot password?</a>
+          </p>
 
           <button id="signin-btn" type="submit">Sign in with Email</button>
         </form>
@@ -56,28 +58,6 @@
           <input id="register-password" name="password" type="password" minlength="8" autocomplete="new-password" required />
 
           <button id="register-btn" type="submit">Create account with Email</button>
-        </form>
-
-        <form id="forgot-form" class="form auth-aux" novalidate hidden>
-          <h2>Reset your password</h2>
-          <p>Enter your account email and we will generate a reset link.</p>
-          <label for="forgot-email">Email</label>
-          <input id="forgot-email" name="email" type="email" autocomplete="email" required />
-          <button id="forgot-btn" type="submit">Send reset link</button>
-          <button id="forgot-back-btn" class="ghost-btn" type="button">Back to sign in</button>
-          <p id="reset-link-preview" class="status" hidden></p>
-        </form>
-
-        <form id="reset-form" class="form auth-aux" novalidate hidden>
-          <h2>Set new password</h2>
-          <p>Create a new password for your account.</p>
-          <input id="reset-token" name="token" type="hidden" />
-          <label for="reset-password">New password</label>
-          <input id="reset-password" name="new_password" type="password" minlength="8" autocomplete="new-password" required />
-          <label for="reset-password-confirm">Confirm new password</label>
-          <input id="reset-password-confirm" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required />
-          <button id="reset-btn" type="submit">Update password</button>
-          <button id="reset-back-btn" class="ghost-btn" type="button">Back to sign in</button>
         </form>
 
         <p id="status" class="status" aria-live="polite"></p>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignalOPs | Reset Password</title>
+  <meta name="description" content="Set a new SignalOPs password." />
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/logo.png" />
+  <link rel="apple-touch-icon" href="/assets/logo.png" />
+  <meta property="og:image" content="/assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/login/css/styles.css" />
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <header class="auth-head">
+        <a class="brand" href="/v1/">
+          <img src="/assets/logo.png" alt="SignalOPs logo" class="brand-logo" />
+          <span>signalops</span>
+        </a>
+        <h1>Reset Password</h1>
+      </header>
+
+      <section class="auth-body">
+        <form id="reset-form" class="form" novalidate>
+          <label for="new-password">New password</label>
+          <input id="new-password" name="new_password" type="password" minlength="8" autocomplete="new-password" required />
+
+          <label for="confirm-password">Confirm password</label>
+          <input id="confirm-password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required />
+
+          <button id="reset-submit-btn" type="submit">Update Password</button>
+        </form>
+
+        <p id="status" class="status" aria-live="polite"></p>
+        <p class="auth-note">
+          <a href="/login/forgot/">Request a new reset link</a>
+          <span> / </span>
+          <a href="/login/">Back to sign in</a>
+        </p>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    window.SIGNALOPS_API_BASE = window.SIGNALOPS_API_BASE || window.location.origin;
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

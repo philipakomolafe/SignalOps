@@ -118,8 +118,6 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordResponse(BaseModel):
 	status: str = "ok"
 	message: str
-	reset_token: Optional[str] = None
-	reset_url: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):

@@ -141,48 +141,6 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.link-btn {
-  margin-top: 0.1rem;
-  border: 0;
-  background: transparent;
-  color: #3b4557;
-  text-align: left;
-  width: fit-content;
-  padding: 0;
-  font-size: 0.74rem;
-  text-decoration: underline;
-}
-
-.ghost-btn {
-  background: #fff;
-  border-color: #d1d8e3;
-}
-
-.auth-aux {
-  display: grid;
-  gap: 0.36rem;
-}
-
-.auth-aux h2 {
-  font-size: 0.98rem;
-  line-height: 1.15;
-}
-
-.auth-aux p {
-  color: #4d5769;
-  font-size: 0.76rem;
-  margin-bottom: 0.1rem;
-}
-
-.auth-aux .status {
-  margin-top: 0.2rem;
-}
-
-.auth-aux a {
-  color: #1e293b;
-  text-decoration: underline;
-}
-
 .status {
   min-height: 1.2rem;
   margin-top: 0.45rem;
@@ -192,6 +150,18 @@ button:disabled {
 
 .status.error {
   color: #9a2525;
+}
+
+.helper-link-row {
+  text-align: right;
+  margin-top: 0.08rem;
+}
+
+.helper-link-row a {
+  color: #394453;
+  text-decoration: none;
+  border-bottom: 1px solid #394453;
+  font-size: 0.72rem;
 }
 
 .tab-panel {
@@ -249,4 +219,30 @@ button:disabled {
   color: #2a3342;
   text-decoration: none;
   border-bottom: 1px solid #2a3342;
+}
+
+.auth-note {
+  margin-top: 0.45rem;
+  font-size: 0.76rem;
+  color: #4d5869;
+  line-height: 1.45;
+}
+
+.auth-note a {
+  color: #2a3342;
+  text-decoration: none;
+  border-bottom: 1px solid #2a3342;
+}
+
+.inline-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+
+.secondary-btn {
+  border: 1px solid #cfd6e0;
+  background: #ffffff;
+  color: #2e3949;
 }
