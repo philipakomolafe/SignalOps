@@ -30,12 +30,21 @@ def send_password_reset_email(*, to_email: str, reset_url: str) -> None:
         ),
     }
 
+    public_base = (settings.app_public_base_url).strip().rstrip("/")
+    user_agent = (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    )
+
     request = urllib.request.Request(
         url="https://api.resend.com/emails",
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "Origin": public_base,
+            "Referer": f"{public_base}/",
+            "User-Agent": user_agent,
         },
         data=json.dumps(payload).encode("utf-8"),
         method="POST",
