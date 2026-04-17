@@ -976,13 +976,12 @@ def create_password_reset_token(user_id: int, token_hash: str, expires_at: str) 
                 """
                 INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
                 VALUES (?, ?, ?)
-                RETURNING reset_id, created_at
+                RETURNING created_at
                 """,
                 (user_id, token_hash, expires_at),
             ).fetchone()
             connection.commit()
             return {
-                "reset_id": int(row["reset_id"]),
                 "created_at": str(row["created_at"]),
             }
 
@@ -994,15 +993,14 @@ def create_password_reset_token(user_id: int, token_hash: str, expires_at: str) 
             """,
             (user_id, token_hash, expires_at),
         )
-        reset_id = int(cursor.lastrowid)
+        _ = int(cursor.lastrowid)
         row = _execute(
             connection,
-            "SELECT created_at FROM password_reset_tokens WHERE reset_id = ?",
-            (reset_id,),
+            "SELECT created_at FROM password_reset_tokens WHERE token_hash = ?",
+            (token_hash,),
         ).fetchone()
         connection.commit()
         return {
-            "reset_id": reset_id,
             "created_at": str(row["created_at"]) if row else "",
         }
 
@@ -1013,10 +1011,9 @@ def get_valid_password_reset_token(token_hash: str) -> Optional[Dict[str, Any]]:
         row = _execute(
             connection,
             """
-            SELECT reset_id, user_id, expires_at, used_at
+            SELECT user_id, expires_at, used_at
             FROM password_reset_tokens
             WHERE token_hash = ?
-            ORDER BY reset_id DESC
             LIMIT 1
             """,
             (token_hash,),
@@ -1044,12 +1041,12 @@ def get_valid_password_reset_token(token_hash: str) -> Optional[Dict[str, Any]]:
         return None
 
     return {
-        "reset_id": int(row["reset_id"]),
         "user_id": int(row["user_id"]),
+        "token_hash": token_hash,
     }
 
 
-def mark_password_reset_token_used(reset_id: int) -> None:
+def mark_password_reset_token_used(token_hash: str) -> None:
     """Mark password reset token as used."""
     with _connect() as connection:
         _execute(
@@ -1057,9 +1054,9 @@ def mark_password_reset_token_used(reset_id: int) -> None:
             """
             UPDATE password_reset_tokens
             SET used_at = CURRENT_TIMESTAMP
-            WHERE reset_id = ? AND used_at IS NULL
+            WHERE token_hash = ? AND used_at IS NULL
             """,
-            (reset_id,),
+            (token_hash,),
         )
         connection.commit()
 

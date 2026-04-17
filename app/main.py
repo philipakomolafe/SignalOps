@@ -846,7 +846,7 @@ def reset_password(payload: ResetPasswordRequest) -> ResetPasswordResponse:
 
     user_id = int(token_row["user_id"])
     update_user_password_hash(user_id=user_id, password_hash=hash_password(payload.new_password))
-    mark_password_reset_token_used(int(token_row["reset_id"]))
+    mark_password_reset_token_used(token_hash)
     revoke_sessions_by_user(user_id)
     logger.info("Password reset completed for user_id=%s", user_id)
     return ResetPasswordResponse(message="Password updated successfully. Please sign in.")
