@@ -7,6 +7,7 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 # FastAPI primitives for app, request handling, dependency injection, and file uploads.
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, Request, Security, UploadFile
@@ -32,6 +33,8 @@ from app.models.schemas import (
     AnalysisResponse,
     DataRetentionRunResponse,
     FounderPostPackMetricsResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     LoginResponse,
     MonitorRunResponse,
@@ -44,6 +47,8 @@ from app.models.schemas import (
     ShopifyConnectStartResponse,
     SignupRequest,
     SignupResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
 )
 # Feature engineering helpers for analytics calculations.
 from app.services.features import compute_comparison_windows, generate_feature_snapshot
@@ -79,6 +84,7 @@ from app.services.persistence import (
     list_active_shopify_connections,
     mark_shopify_connection_synced,
     revoke_session,
+    revoke_all_sessions_for_user,
     run_data_retention,
     save_analysis_timing,
     save_payment_event,
@@ -86,6 +92,9 @@ from app.services.persistence import (
     save_analysis,
     save_action_feedback,
     get_founder_post_pack_metrics,
+    create_password_reset_token,
+    consume_password_reset_token,
+    update_user_password_hash,
     upsert_billing_subscription,
     update_shopify_connection_tokens,
     upsert_shopify_connection,
@@ -729,6 +738,12 @@ def conversation_entry(conversation_id: str) -> RedirectResponse:
     return RedirectResponse(url=f"/dashboard/#/c/{conversation_id}")
 
 
+def _password_reset_url(token: str) -> str:
+    """Build frontend password-reset URL for a reset token."""
+    base = (settings.app_public_base_url or "http://127.0.0.1:8000").rstrip("/")
+    return f"{base}/login/?reset_token={quote(token)}"
+
+
 @app.post("/api/v1/auth/signup", response_model=SignupResponse)
 def signup(payload: SignupRequest) -> SignupResponse:
     """Create a new user account."""
@@ -778,6 +793,49 @@ def login(payload: LoginRequest) -> LoginResponse:
             company=user["company"],
         ),
     )
+
+
+@app.post("/api/v1/auth/password/forgot", response_model=ForgotPasswordResponse)
+def forgot_password(payload: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    """Create one-time password reset token for a known account."""
+    generic_message = "If an account exists for this email, a reset link has been generated."
+    user = get_user_by_email(str(payload.email))
+    if not user:
+        logger.info("Password reset requested for unknown email=%s", mask_email(str(payload.email)))
+        return ForgotPasswordResponse(message=generic_message)
+
+    ttl_minutes = max(5, int(settings.auth_reset_token_ttl_minutes))
+    plain_token = secrets.token_urlsafe(36)
+    token_hash = hash_token(plain_token)
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).isoformat()
+    create_password_reset_token(
+        user_id=int(user["user_id"]),
+        token_hash=token_hash,
+        expires_at=expires_at,
+    )
+
+    logger.info("Password reset token generated for user_id=%s email=%s", user["user_id"], mask_email(str(user["email"])))
+    if settings.auth_expose_reset_token_for_dev:
+        return ForgotPasswordResponse(
+            message=generic_message,
+            reset_token=plain_token,
+            reset_url=_password_reset_url(plain_token),
+        )
+    return ForgotPasswordResponse(message=generic_message)
+
+
+@app.post("/api/v1/auth/password/reset", response_model=ResetPasswordResponse)
+def reset_password(payload: ResetPasswordRequest) -> ResetPasswordResponse:
+    """Validate reset token and set a new password for the account."""
+    token_hash = hash_token(payload.token)
+    user_id = consume_password_reset_token(token_hash)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    update_user_password_hash(user_id=user_id, password_hash=hash_password(payload.new_password))
+    revoke_all_sessions_for_user(user_id)
+    logger.info("Password reset completed for user_id=%s", user_id)
+    return ResetPasswordResponse(message="Password updated successfully. Please sign in again.")
 
 
 @app.get("/api/v1/auth/me", response_model=AuthUser)

@@ -111,6 +111,27 @@ class LoginResponse(BaseModel):
 	user: AuthUser
 
 
+class ForgotPasswordRequest(BaseModel):
+	email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+	status: str = "ok"
+	message: str
+	reset_token: Optional[str] = None
+	reset_url: Optional[str] = None
+
+
+class ResetPasswordRequest(BaseModel):
+	token: str = Field(min_length=20, max_length=512)
+	new_password: str = Field(min_length=8, max_length=256)
+
+
+class ResetPasswordResponse(BaseModel):
+	status: str = "ok"
+	message: str
+
+
 class ShopifyConnectStartRequest(BaseModel):
 	shop_domain: str = Field(min_length=5, max_length=255)
 

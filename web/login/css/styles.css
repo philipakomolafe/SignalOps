@@ -141,6 +141,48 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.link-btn {
+  margin-top: 0.1rem;
+  border: 0;
+  background: transparent;
+  color: #3b4557;
+  text-align: left;
+  width: fit-content;
+  padding: 0;
+  font-size: 0.74rem;
+  text-decoration: underline;
+}
+
+.ghost-btn {
+  background: #fff;
+  border-color: #d1d8e3;
+}
+
+.auth-aux {
+  display: grid;
+  gap: 0.36rem;
+}
+
+.auth-aux h2 {
+  font-size: 0.98rem;
+  line-height: 1.15;
+}
+
+.auth-aux p {
+  color: #4d5769;
+  font-size: 0.76rem;
+  margin-bottom: 0.1rem;
+}
+
+.auth-aux .status {
+  margin-top: 0.2rem;
+}
+
+.auth-aux a {
+  color: #1e293b;
+  text-decoration: underline;
+}
+
 .status {
   min-height: 1.2rem;
   margin-top: 0.45rem;

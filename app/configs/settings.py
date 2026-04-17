@@ -19,6 +19,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ADMIN_EMAILS", "ADMIN_EMAIL"),
     )
     app_public_base_url: str = "http://127.0.0.1:8000"
+    auth_reset_token_ttl_minutes: int = Field(
+        default=30,
+        validation_alias=AliasChoices("AUTH_RESET_TOKEN_TTL_MINUTES"),
+    )
+    auth_expose_reset_token_for_dev: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("AUTH_EXPOSE_RESET_TOKEN_FOR_DEV"),
+    )
     monitor_internal_token: str = Field(
         default="",
         validation_alias=AliasChoices("MONITOR_INTERNAL_TOKEN"),

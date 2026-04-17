@@ -1,16 +1,25 @@
-import { fetchCurrentUser, login, signup } from "./api.js";
+import { fetchCurrentUser, login, requestPasswordReset, resetPassword, signup } from "./api.js";
 
 const TOKEN_STORAGE_KEY = "signalops_access_token";
 const RESUME_CHECKOUT_KEY = "signalops_resume_checkout";
 
 const signinForm = document.getElementById("signin-form");
 const registerForm = document.getElementById("register-form");
+const forgotForm = document.getElementById("forgot-form");
+const resetForm = document.getElementById("reset-form");
 const statusEl = document.getElementById("status");
 const signinBtn = document.getElementById("signin-btn");
 const registerBtn = document.getElementById("register-btn");
+const forgotBtn = document.getElementById("forgot-btn");
+const resetBtn = document.getElementById("reset-btn");
 const successEl = document.getElementById("success");
 const tabs = Array.from(document.querySelectorAll(".tab"));
 const panels = Array.from(document.querySelectorAll(".tab-panel"));
+const forgotPasswordLink = document.getElementById("forgot-password-link");
+const forgotBackBtn = document.getElementById("forgot-back-btn");
+const resetBackBtn = document.getElementById("reset-back-btn");
+const resetLinkPreviewEl = document.getElementById("reset-link-preview");
+const resetTokenInput = document.getElementById("reset-token");
 
 let isRedirectingToDashboard = false;
 
@@ -61,6 +70,22 @@ function activateTab(tabName) {
   });
 }
 
+function setAuxPanel(mode) {
+  const next = String(mode || "none").toLowerCase();
+  if (forgotForm) forgotForm.hidden = next !== "forgot";
+  if (resetForm) resetForm.hidden = next !== "reset";
+  if (next === "none") {
+    panels.forEach((panel) => {
+      panel.hidden = !panel.classList.contains("active");
+    });
+    return;
+  }
+
+  if (signinForm) signinForm.hidden = true;
+  if (registerForm) registerForm.hidden = true;
+  if (successEl) successEl.hidden = true;
+}
+
 function setSubmitting(button, isSubmitting, busyLabel, idleLabel) {
   if (!button) return;
   button.disabled = isSubmitting;
@@ -92,10 +117,42 @@ async function redirectIfSessionIsActive() {
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     activateTab(tab.dataset.tabTarget || "signin");
+    setAuxPanel("none");
     if (successEl) successEl.hidden = true;
     setStatus("");
   });
 });
+
+if (forgotPasswordLink) {
+  forgotPasswordLink.addEventListener("click", () => {
+    activateTab("signin");
+    setAuxPanel("forgot");
+    setStatus("");
+    if (resetLinkPreviewEl) {
+      resetLinkPreviewEl.hidden = true;
+      resetLinkPreviewEl.textContent = "";
+    }
+  });
+}
+
+if (forgotBackBtn) {
+  forgotBackBtn.addEventListener("click", () => {
+    setAuxPanel("none");
+    activateTab("signin");
+    setStatus("");
+  });
+}
+
+if (resetBackBtn) {
+  resetBackBtn.addEventListener("click", () => {
+    setAuxPanel("none");
+    activateTab("signin");
+    setStatus("");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("reset_token");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  });
+}
 
 if (signinForm) {
   signinForm.addEventListener("submit", async (event) => {
@@ -156,10 +213,87 @@ if (registerForm) {
   });
 }
 
-if (window.location.hash === "#register") {
+if (forgotForm) {
+  forgotForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!forgotForm.reportValidity()) {
+      return;
+    }
+
+    const payload = { email: forgotForm.email.value.trim() };
+    setSubmitting(forgotBtn, true, "Sending...", "Send reset link");
+    setStatus("Generating reset link...");
+    if (resetLinkPreviewEl) {
+      resetLinkPreviewEl.hidden = true;
+      resetLinkPreviewEl.textContent = "";
+    }
+
+    try {
+      const result = await requestPasswordReset(payload);
+      setStatus(result.message || "If the account exists, a reset link has been generated.");
+      if (result.reset_url && resetLinkPreviewEl) {
+        resetLinkPreviewEl.hidden = false;
+        resetLinkPreviewEl.innerHTML = `Reset link (dev): <a href="${result.reset_url}">Open reset page</a>`;
+      }
+    } catch (error) {
+      setStatus(error.message || "Failed to request password reset.", true);
+    } finally {
+      setSubmitting(forgotBtn, false, "Sending...", "Send reset link");
+    }
+  });
+}
+
+if (resetForm) {
+  resetForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!resetForm.reportValidity()) {
+      return;
+    }
+
+    const token = String(resetForm.token.value || "").trim();
+    const password = String(resetForm.new_password.value || "");
+    const confirm = String(resetForm.confirm_password.value || "");
+    if (!token) {
+      setStatus("Reset token is missing. Request a new password reset link.", true);
+      return;
+    }
+    if (password !== confirm) {
+      setStatus("Password confirmation does not match.", true);
+      return;
+    }
+
+    setSubmitting(resetBtn, true, "Updating...", "Update password");
+    setStatus("Updating password...");
+    try {
+      const result = await resetPassword({ token, new_password: password });
+      resetForm.reset();
+      if (resetTokenInput) resetTokenInput.value = "";
+      setAuxPanel("none");
+      activateTab("signin");
+      setStatus(result.message || "Password updated. Sign in with your new password.");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("reset_token");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+    } catch (error) {
+      setStatus(error.message || "Failed to reset password.", true);
+    } finally {
+      setSubmitting(resetBtn, false, "Updating...", "Update password");
+    }
+  });
+}
+
+const params = new URLSearchParams(window.location.search);
+const resetTokenFromUrl = (params.get("reset_token") || "").trim();
+if (resetTokenFromUrl && resetTokenInput) {
+  activateTab("signin");
+  resetTokenInput.value = resetTokenFromUrl;
+  setAuxPanel("reset");
+} else if (window.location.hash === "#register") {
   activateTab("register");
+  setAuxPanel("none");
 } else {
   activateTab("signin");
+  setAuxPanel("none");
 }
 
 redirectIfSessionIsActive();

@@ -354,6 +354,33 @@ def init_storage() -> None:
                 ON action_feedback (user_id, action_date DESC)
                 """,
             )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    reset_token_id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used_at TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user
+                ON password_reset_tokens (user_id, created_at DESC)
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expiry
+                ON password_reset_tokens (expires_at, used_at)
+                """,
+            )
             connection.commit()
             return
 
@@ -571,6 +598,33 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_action_feedback_user_date
             ON action_feedback (user_id, action_date DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                reset_token_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL UNIQUE,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user
+            ON password_reset_tokens (user_id, created_at DESC)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expiry
+            ON password_reset_tokens (expires_at, used_at)
             """,
         )
         connection.commit()
@@ -901,6 +955,131 @@ def revoke_session(token_hash: str) -> None:
             (token_hash,),
         )
         connection.commit()
+
+
+def revoke_all_sessions_for_user(user_id: int) -> None:
+    """Revoke all active sessions for a user (used after password reset)."""
+    logger.info("Revoking all sessions for user_id=%s", user_id)
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            UPDATE user_sessions
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE user_id = ? AND revoked_at IS NULL
+            """,
+            (user_id,),
+        )
+        connection.commit()
+
+
+def update_user_password_hash(user_id: int, password_hash: str) -> None:
+    """Update password hash for a user account."""
+    with _connect() as connection:
+        _execute(
+            connection,
+            """
+            UPDATE users
+            SET password_hash = ?
+            WHERE user_id = ?
+            """,
+            (password_hash, user_id),
+        )
+        connection.commit()
+
+
+def create_password_reset_token(user_id: int, token_hash: str, expires_at: str) -> None:
+    """Create a one-time password reset token and invalidate older active tokens."""
+    with _connect() as connection:
+        if _is_postgres():
+            _execute(
+                connection,
+                """
+                UPDATE password_reset_tokens
+                SET used_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+                """,
+                (user_id,),
+            )
+        else:
+            _execute(
+                connection,
+                """
+                UPDATE password_reset_tokens
+                SET used_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND used_at IS NULL AND datetime(expires_at) > datetime('now')
+                """,
+                (user_id,),
+            )
+
+        _execute(
+            connection,
+            """
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, token_hash, expires_at),
+        )
+        connection.commit()
+
+
+def consume_password_reset_token(token_hash: str) -> Optional[int]:
+    """Atomically consume a password reset token and return user_id when valid."""
+    with _connect() as connection:
+        if _is_postgres():
+            row = _execute(
+                connection,
+                """
+                WITH candidate AS (
+                    SELECT reset_token_id, user_id
+                    FROM password_reset_tokens
+                    WHERE token_hash = ?
+                      AND used_at IS NULL
+                      AND expires_at > CURRENT_TIMESTAMP
+                    ORDER BY reset_token_id DESC
+                    LIMIT 1
+                    FOR UPDATE
+                )
+                UPDATE password_reset_tokens t
+                SET used_at = CURRENT_TIMESTAMP
+                FROM candidate c
+                WHERE t.reset_token_id = c.reset_token_id
+                RETURNING c.user_id
+                """,
+                (token_hash,),
+            ).fetchone()
+            connection.commit()
+            return int(row["user_id"]) if row else None
+
+        row = _execute(
+            connection,
+            """
+            SELECT reset_token_id, user_id
+            FROM password_reset_tokens
+            WHERE token_hash = ?
+              AND used_at IS NULL
+              AND datetime(expires_at) > datetime('now')
+            ORDER BY reset_token_id DESC
+            LIMIT 1
+            """,
+            (token_hash,),
+        ).fetchone()
+        if not row:
+            return None
+
+        updated = _execute(
+            connection,
+            """
+            UPDATE password_reset_tokens
+            SET used_at = CURRENT_TIMESTAMP
+            WHERE reset_token_id = ? AND used_at IS NULL
+            """,
+            (int(row["reset_token_id"]),),
+        ).rowcount
+        connection.commit()
+        if not updated:
+            return None
+        return int(row["user_id"])
 
 
 def upsert_shopify_connection(
