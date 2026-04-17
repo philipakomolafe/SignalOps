@@ -10,9 +10,11 @@ from app.configs.settings import settings
 def send_password_reset_email(*, to_email: str, reset_url: str) -> None:
     """Send password reset email via Resend."""
     api_key = (settings.resend_api_key or "").strip()
-    from_email = (settings.resend_from_email or "").strip()
-    if not api_key or not from_email:
+    sender = ({settings.resend_from_email} or "").strip()
+    if not api_key or not sender:
         raise RuntimeError("Resend email service is not configured")
+    
+    from_email = f"SignalOps <{sender}>"
 
     payload = {
         "from": from_email,
