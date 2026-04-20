@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 # Only keep scopes that do not require protected customer data approval.
 _NON_PROTECTED_SCOPES = {
-    "read_orders",
     "read_all_orders",
+    "read_orders",
+    "read_products"
 }
 
 # Ask Shopify for only operational order fields and strip customer PII from responses.
@@ -40,7 +41,7 @@ def _safe_shopify_scopes() -> str:
     """Return a comma-separated scope list constrained to non-protected scopes."""
     configured = [part.strip() for part in (settings.shopify_scopes or "").split(",") if part.strip()]
     if not configured:
-        return "read_orders"
+        return "read_all_orders,read_orders,read_products"
 
     safe = [scope for scope in configured if scope in _NON_PROTECTED_SCOPES]
     if not safe:

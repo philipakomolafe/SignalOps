@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     shopify_api_key: str = Field(default="", validation_alias=AliasChoices("SHOPIFY_API_KEY"))
     shopify_api_secret: str = Field(default="", validation_alias=AliasChoices("SHOPIFY_API_SECRET"))
     shopify_scopes: str = Field(
-        default="read_orders",
+        default="read_all_orders,read_orders,read_products",
         validation_alias=AliasChoices("SHOPIFY_SCOPES"),
     )
     shopify_api_version: str = Field(

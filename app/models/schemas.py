@@ -21,6 +21,26 @@ class CohortRetentionPoint(BaseModel):
 	retention_rate_30d: float
 
 
+class ProductPerformanceItem(BaseModel):
+	product_id: Optional[str] = None
+	variant_id: Optional[str] = None
+	sku: Optional[str] = None
+	title: str
+	order_count: int = 0
+	units_sold: int = 0
+	gross_revenue: float = 0.0
+	net_revenue: float = 0.0
+	refund_amount: float = 0.0
+	refund_rate: float = 0.0
+
+
+class ProductPerformanceSnapshot(BaseModel):
+	products_analyzed: int = 0
+	units_sold: int = 0
+	top_products_by_revenue: List[ProductPerformanceItem] = Field(default_factory=list)
+	top_products_by_refund_rate: List[ProductPerformanceItem] = Field(default_factory=list)
+
+
 class FeatureSnapshot(BaseModel):
 	total_revenue: float
 	order_count: int
@@ -33,6 +53,7 @@ class FeatureSnapshot(BaseModel):
 	avg_purchase_interval_days: Optional[float] = None
 	week_over_week_revenue_change_pct: Optional[float] = None
 	cohort_retention_30d: List[CohortRetentionPoint] = Field(default_factory=list)
+	product_performance: ProductPerformanceSnapshot = Field(default_factory=ProductPerformanceSnapshot)
 
 
 class DiagnosisBlock(BaseModel):
@@ -174,6 +195,8 @@ class ProductImpactMetrics(BaseModel):
 	repeat_rate: float = 0.0
 	refund_rate: float = 0.0
 	week_over_week_revenue_change_pct: Optional[float] = None
+	top_products_by_revenue: List[ProductPerformanceItem] = Field(default_factory=list)
+	top_products_by_refund_rate: List[ProductPerformanceItem] = Field(default_factory=list)
 	based_on_run_id: Optional[int] = None
 	based_on_created_at: Optional[str] = None
 

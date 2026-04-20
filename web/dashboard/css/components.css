@@ -562,6 +562,76 @@
   margin-top: 8px;
 }
 
+.product-overview,
+.product-sections {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.product-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-sections {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.product-section {
+  border: 1px solid #d8dde5;
+  border-radius: 9px;
+  background: #ffffff;
+  padding: 9px;
+}
+
+.product-section h4 {
+  font-family: "Manrope", sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 0.45rem;
+  color: #1f2a3a;
+}
+
+.product-list {
+  display: grid;
+  gap: 7px;
+}
+
+.product-row {
+  border: 1px solid #dbe2eb;
+  border-radius: 8px;
+  background: #fbfcff;
+  padding: 8px;
+}
+
+.product-row-head,
+.product-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.product-row-head {
+  margin-bottom: 0.2rem;
+}
+
+.product-row-head strong {
+  font-size: 0.82rem;
+  color: #1f2a3a;
+}
+
+.product-row-head span,
+.product-row-meta span {
+  font-size: 0.74rem;
+  color: #5a677a;
+}
+
+.product-row-meta {
+  flex-wrap: wrap;
+}
+
 .metric,
 .diagnosis,
 .finding {
@@ -959,7 +1029,9 @@
   }
 
   .metrics-grid,
-  .diagnosis-grid {
+  .diagnosis-grid,
+  .product-overview,
+  .product-sections {
     grid-template-columns: 1fr;
   }
 

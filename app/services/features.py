@@ -10,12 +10,27 @@ from statistics import mean
 from typing import Dict, List, Optional, Tuple
 
 # Response models used by feature snapshots.
-from app.models.schemas import CohortRetentionPoint, FeatureSnapshot
+from app.models.schemas import (
+    CohortRetentionPoint,
+    FeatureSnapshot,
+    ProductPerformanceItem,
+    ProductPerformanceSnapshot,
+)
 # Normalized event shape produced by ingestion service.
-from app.services.ingestion import NormalizedOrderEvent
+from app.services.ingestion import NormalizedLineItem, NormalizedOrderEvent
 
 
 logger = logging.getLogger(__name__)
+
+
+def _line_item_key(line_item: NormalizedLineItem) -> str:
+    """Return a stable grouping key for product analytics."""
+    return (
+        line_item.product_id
+        or line_item.variant_id
+        or line_item.sku
+        or line_item.title.strip().lower()
+    )
 
 
 def _safe_pct_change(current: float, previous: float) -> Optional[float]:
@@ -129,6 +144,75 @@ def _window_repeat_and_interval(
     return repeat_rate, interval
 
 
+def _build_product_performance(events: List[NormalizedOrderEvent]) -> ProductPerformanceSnapshot:
+    """Aggregate product-level KPIs from normalized line items."""
+    grouped: Dict[str, Dict[str, object]] = {}
+    total_units = 0
+
+    for event in events:
+        seen_products_in_order = set()
+        for line_item in event.line_items:
+            key = _line_item_key(line_item)
+            if not key:
+                continue
+            total_units += max(line_item.quantity, 0)
+            if key not in grouped:
+                grouped[key] = {
+                    "product_id": line_item.product_id,
+                    "variant_id": line_item.variant_id,
+                    "sku": line_item.sku or None,
+                    "title": line_item.title,
+                    "units_sold": 0,
+                    "gross_revenue": 0.0,
+                    "refund_amount": 0.0,
+                    "order_count": 0,
+                }
+            stats = grouped[key]
+            stats["units_sold"] = int(stats["units_sold"]) + max(line_item.quantity, 0)
+            stats["gross_revenue"] = float(stats["gross_revenue"]) + max(line_item.gross_revenue, 0.0)
+            stats["refund_amount"] = float(stats["refund_amount"]) + max(line_item.refunded_amount, 0.0)
+            if key not in seen_products_in_order:
+                stats["order_count"] = int(stats["order_count"]) + 1
+                seen_products_in_order.add(key)
+
+    items: List[ProductPerformanceItem] = []
+    for stats in grouped.values():
+        gross_revenue = float(stats["gross_revenue"])
+        refund_amount = float(stats["refund_amount"])
+        items.append(
+            ProductPerformanceItem(
+                product_id=stats["product_id"],
+                variant_id=stats["variant_id"],
+                sku=stats["sku"],
+                title=str(stats["title"]),
+                order_count=int(stats["order_count"]),
+                units_sold=int(stats["units_sold"]),
+                gross_revenue=round(gross_revenue, 2),
+                net_revenue=round(max(gross_revenue - refund_amount, 0.0), 2),
+                refund_amount=round(refund_amount, 2),
+                refund_rate=round((refund_amount / gross_revenue) * 100.0, 2) if gross_revenue else 0.0,
+            )
+        )
+
+    top_by_revenue = sorted(
+        items,
+        key=lambda item: (item.net_revenue, item.gross_revenue, item.units_sold),
+        reverse=True,
+    )[:5]
+    top_by_refund_rate = sorted(
+        [item for item in items if item.gross_revenue > 0 or item.refund_amount > 0],
+        key=lambda item: (item.refund_rate, item.refund_amount, item.gross_revenue),
+        reverse=True,
+    )[:5]
+
+    return ProductPerformanceSnapshot(
+        products_analyzed=len(items),
+        units_sold=total_units,
+        top_products_by_revenue=top_by_revenue,
+        top_products_by_refund_rate=top_by_refund_rate,
+    )
+
+
 def generate_feature_snapshot(events: List[NormalizedOrderEvent]) -> FeatureSnapshot:
     """Generate all primary features consumed by leak detection and reporting."""
     logger.info("Generating feature snapshot for %s events", len(events))
@@ -185,6 +269,7 @@ def generate_feature_snapshot(events: List[NormalizedOrderEvent]) -> FeatureSnap
         ),
         week_over_week_revenue_change_pct=round(wow_change, 2) if wow_change is not None else None,
         cohort_retention_30d=_build_cohort_retention(by_customer),
+        product_performance=_build_product_performance(events),
     )
 
 

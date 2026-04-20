@@ -13,6 +13,84 @@ function diagnosis(label, body) {
   return el("article", "diagnosis", `<span class="label">${label}</span><p>${body}</p>`);
 }
 
+function formatCurrency(value) {
+  return `$${Number(value || 0).toLocaleString()}`;
+}
+
+function formatPct(value) {
+  return `${Number(value || 0).toFixed(2)}%`;
+}
+
+function productRow(item, emphasisLabel, emphasisValue) {
+  const label = item.title || item.sku || item.product_id || item.variant_id || "Untitled product";
+  return el(
+    "article",
+    "product-row",
+    `
+      <div class="product-row-head">
+        <strong>${label}</strong>
+        <span>${emphasisLabel}: ${emphasisValue}</span>
+      </div>
+      <div class="product-row-meta">
+        <span>Units ${Number(item.units_sold || 0).toLocaleString()}</span>
+        <span>Orders ${Number(item.order_count || 0).toLocaleString()}</span>
+        <span>Refunds ${formatCurrency(item.refund_amount || 0)}</span>
+      </div>
+    `
+  );
+}
+
+function renderProductPerformance(features) {
+  const productPerformance = features.product_performance || {};
+  const topRevenue = Array.isArray(productPerformance.top_products_by_revenue)
+    ? productPerformance.top_products_by_revenue
+    : [];
+  const topRefund = Array.isArray(productPerformance.top_products_by_refund_rate)
+    ? productPerformance.top_products_by_refund_rate
+    : [];
+
+  if (!productPerformance.products_analyzed && topRevenue.length === 0 && topRefund.length === 0) {
+    return null;
+  }
+
+  const disclosureEl = disclosure(
+    "Product performance",
+    `${Number(productPerformance.products_analyzed || 0).toLocaleString()} products analyzed`
+  );
+
+  const overview = el("div", "product-overview");
+  overview.appendChild(metric("Products", Number(productPerformance.products_analyzed || 0).toLocaleString()));
+  overview.appendChild(metric("Units Sold", Number(productPerformance.units_sold || 0).toLocaleString()));
+  disclosureEl.appendChild(overview);
+
+  const sections = el("div", "product-sections");
+
+  if (topRevenue.length) {
+    const revenueSection = el("section", "product-section");
+    revenueSection.appendChild(el("h4", "", "Top by revenue"));
+    const revenueList = el("div", "product-list");
+    topRevenue.forEach((item) => {
+      revenueList.appendChild(productRow(item, "Net", formatCurrency(item.net_revenue || 0)));
+    });
+    revenueSection.appendChild(revenueList);
+    sections.appendChild(revenueSection);
+  }
+
+  if (topRefund.length) {
+    const refundSection = el("section", "product-section");
+    refundSection.appendChild(el("h4", "", "Top by refund rate"));
+    const refundList = el("div", "product-list");
+    topRefund.forEach((item) => {
+      refundList.appendChild(productRow(item, "Refund rate", formatPct(item.refund_rate || 0)));
+    });
+    refundSection.appendChild(refundList);
+    sections.appendChild(refundSection);
+  }
+
+  disclosureEl.appendChild(sections);
+  return disclosureEl;
+}
+
 function disclosure(title, subtitle = "") {
   const details = el("details", "disclosure");
   const summary = el("summary", "");
@@ -54,18 +132,23 @@ export function renderAnalysis(feed, payload) {
 
   const features = payload.features || {};
   const metricsGrid = el("div", "metrics-grid");
-  metricsGrid.appendChild(metric("Total Revenue", `$${Number(features.total_revenue || 0).toLocaleString()}`));
-  metricsGrid.appendChild(metric("Revenue/User", `$${Number(features.revenue_per_user || 0).toLocaleString()}`));
+  metricsGrid.appendChild(metric("Total Revenue", formatCurrency(features.total_revenue || 0)));
+  metricsGrid.appendChild(metric("Revenue/User", formatCurrency(features.revenue_per_user || 0)));
   metricsGrid.appendChild(metric("Purchase Frequency", Number(features.purchase_frequency || 0).toFixed(2)));
-  metricsGrid.appendChild(metric("Repeat Rate", `${Number(features.repeat_rate || 0).toFixed(2)}%`));
-  metricsGrid.appendChild(metric("Refund Rate", `${Number(features.refund_rate || 0).toFixed(2)}%`));
+  metricsGrid.appendChild(metric("Repeat Rate", formatPct(features.repeat_rate || 0)));
+  metricsGrid.appendChild(metric("Refund Rate", formatPct(features.refund_rate || 0)));
   metricsGrid.appendChild(metric(
     "WoW Revenue",
     features.week_over_week_revenue_change_pct === null || features.week_over_week_revenue_change_pct === undefined
       ? "N/A"
-      : `${Number(features.week_over_week_revenue_change_pct).toFixed(2)}%`
+      : formatPct(features.week_over_week_revenue_change_pct)
   ));
   wrapper.appendChild(metricsGrid);
+
+  const productPerformance = renderProductPerformance(features);
+  if (productPerformance) {
+    wrapper.appendChild(productPerformance);
+  }
 
   const findingsGrid = el("div", "findings-grid");
   const findings = Array.isArray(payload.findings) ? payload.findings : [];
@@ -106,17 +189,17 @@ export function renderPerformanceDefault(feed, payload) {
   );
 
   const metricsGrid = el("div", "metrics-grid");
-  metricsGrid.appendChild(metric("Total Revenue", `$${Number(summary.total_revenue || 0).toLocaleString()}`));
+  metricsGrid.appendChild(metric("Total Revenue", formatCurrency(summary.total_revenue || 0)));
   metricsGrid.appendChild(metric("Orders", Number(summary.order_count || 0).toLocaleString()));
   metricsGrid.appendChild(metric("Customers", Number(summary.customer_count || 0).toLocaleString()));
-  metricsGrid.appendChild(metric("Revenue/User", `$${Number(summary.revenue_per_user || 0).toLocaleString()}`));
+  metricsGrid.appendChild(metric("Revenue/User", formatCurrency(summary.revenue_per_user || 0)));
   metricsGrid.appendChild(metric("Purchase Frequency", Number(summary.purchase_frequency || 0).toFixed(2)));
   metricsGrid.appendChild(
     metric(
       "WoW Revenue",
       summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
         ? "N/A"
-        : `${Number(summary.week_over_week_revenue_change_pct).toFixed(2)}%`
+        : formatPct(summary.week_over_week_revenue_change_pct)
     )
   );
   wrapper.appendChild(metricsGrid);

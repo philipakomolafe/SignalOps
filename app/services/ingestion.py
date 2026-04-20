@@ -4,7 +4,7 @@ import io
 # Logging for ingestion failures and normalization diagnostics.
 import logging
 # Dataclass used as normalized event record.
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 # Datetime parser for order timestamp normalization.
 from datetime import datetime
 # Type hints for better readability and tooling.
@@ -21,10 +21,27 @@ COLUMN_ALIASES = {
     "order_total": ["order_total", "total_price", "total", "amount", "gross_sales"],
     "refunded_amount": ["refunded_amount", "refund_total", "total_refunded", "refunds"],
     "currency": ["currency", "presentment_currency", "shop_currency"],
+    "product_id": ["product_id", "product", "item_id"],
+    "variant_id": ["variant_id", "variant", "item_variant_id"],
+    "sku": ["sku", "item_sku", "variant_sku"],
+    "product_title": ["product_title", "product_name", "title", "item_name"],
+    "quantity": ["quantity", "qty", "item_quantity"],
 }
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class NormalizedLineItem:
+    """Canonical product row shape attached to an order event."""
+    product_id: Optional[str]
+    variant_id: Optional[str]
+    sku: str
+    title: str
+    quantity: int
+    gross_revenue: float
+    refunded_amount: float
 
 
 @dataclass
@@ -42,6 +59,8 @@ class NormalizedOrderEvent:
     refunded_amount: float
     # Currency code (e.g., USD).
     currency: str
+    # Optional product rows attached to this order.
+    line_items: List[NormalizedLineItem] = field(default_factory=list)
 
 
 class CSVNormalizationError(ValueError):
@@ -76,6 +95,18 @@ def _parse_float(raw: str, field_name: str) -> float:
         logger.warning("Invalid numeric value for %s: %r", field_name, raw)
         # Raise normalization-specific error with field context.
         raise CSVNormalizationError(f"Invalid numeric value in {field_name}: '{raw}'") from exc
+
+
+def _parse_int(raw: str, field_name: str, default: int = 0) -> int:
+    """Parse integer-like strings; blank values fall back to the provided default."""
+    value = (raw or "").strip().replace(",", "")
+    if not value:
+        return default
+    try:
+        return int(float(value))
+    except ValueError as exc:
+        logger.warning("Invalid integer value for %s: %r", field_name, raw)
+        raise CSVNormalizationError(f"Invalid integer value in {field_name}: '{raw}'") from exc
 
 
 def _parse_datetime(raw: str) -> datetime:
@@ -167,6 +198,30 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
             str(row.get(currency_value, default_currency)).strip().upper() if currency_value else default_currency
         )
 
+        line_items: List[NormalizedLineItem] = []
+        product_title_column = selected.get("product_title")
+        product_title = str(row.get(product_title_column, "")).strip() if product_title_column else ""
+        product_id_column = selected.get("product_id")
+        variant_id_column = selected.get("variant_id")
+        sku_column = selected.get("sku")
+        quantity_column = selected.get("quantity")
+        product_id = str(row.get(product_id_column, "")).strip() if product_id_column else ""
+        variant_id = str(row.get(variant_id_column, "")).strip() if variant_id_column else ""
+        sku = str(row.get(sku_column, "")).strip() if sku_column else ""
+        if product_title or product_id or variant_id or sku:
+            quantity = _parse_int(str(row.get(quantity_column, "")), "quantity", default=1) if quantity_column else 1
+            line_items.append(
+                NormalizedLineItem(
+                    product_id=product_id or None,
+                    variant_id=variant_id or None,
+                    sku=sku,
+                    title=product_title or sku or product_id or variant_id or order_id,
+                    quantity=max(quantity, 0),
+                    gross_revenue=order_total,
+                    refunded_amount=refunded_amount,
+                )
+            )
+
         # Build normalized event object and append.
         events.append(
             NormalizedOrderEvent(
@@ -176,6 +231,7 @@ def normalize_orders_csv(csv_text: str, default_currency: str = "USD") -> List[N
                 order_total=order_total,
                 refunded_amount=refunded_amount,
                 currency=currency or default_currency,
+                line_items=line_items,
             )
         )
 
@@ -237,6 +293,58 @@ def normalize_shopify_orders(
         if not currency:
             currency = default_currency
 
+        refund_amount_by_line_item_id: Dict[str, float] = {}
+        if isinstance(refunds_obj, list):
+            for refund in refunds_obj:
+                if not isinstance(refund, dict):
+                    continue
+                refund_line_items = refund.get("refund_line_items")
+                if not isinstance(refund_line_items, list):
+                    continue
+                for refund_line_item in refund_line_items:
+                    if not isinstance(refund_line_item, dict):
+                        continue
+                    line_item = refund_line_item.get("line_item")
+                    if not isinstance(line_item, dict):
+                        continue
+                    line_item_id = str(line_item.get("id") or "").strip()
+                    if not line_item_id:
+                        continue
+                    subtotal = refund_line_item.get("subtotal")
+                    if subtotal is None:
+                        unit_price = _parse_float(str(line_item.get("price") or "0"), "line_item_price")
+                        quantity = _parse_int(str(refund_line_item.get("quantity") or "0"), "refund_quantity")
+                        amount = unit_price * max(quantity, 0)
+                    else:
+                        amount = _parse_float(str(subtotal), "refund_line_subtotal")
+                    refund_amount_by_line_item_id[line_item_id] = (
+                        refund_amount_by_line_item_id.get(line_item_id, 0.0) + max(amount, 0.0)
+                    )
+
+        line_items: List[NormalizedLineItem] = []
+        raw_line_items = order.get("line_items")
+        if isinstance(raw_line_items, list):
+            for raw_line_item in raw_line_items:
+                if not isinstance(raw_line_item, dict):
+                    continue
+                quantity = _parse_int(str(raw_line_item.get("quantity") or "0"), "quantity")
+                unit_price = _parse_float(str(raw_line_item.get("price") or "0"), "line_item_price")
+                total_discount = _parse_float(str(raw_line_item.get("total_discount") or "0"), "line_item_discount")
+                gross_revenue = max((unit_price * max(quantity, 0)) - total_discount, 0.0)
+                line_item_id = str(raw_line_item.get("id") or "").strip()
+                refunded_line_amount = refund_amount_by_line_item_id.get(line_item_id, 0.0)
+                line_items.append(
+                    NormalizedLineItem(
+                        product_id=str(raw_line_item.get("product_id") or "").strip() or None,
+                        variant_id=str(raw_line_item.get("variant_id") or "").strip() or None,
+                        sku=str(raw_line_item.get("sku") or "").strip(),
+                        title=str(raw_line_item.get("title") or raw_line_item.get("name") or order_id).strip(),
+                        quantity=max(quantity, 0),
+                        gross_revenue=gross_revenue,
+                        refunded_amount=max(refunded_line_amount, 0.0),
+                    )
+                )
+
         events.append(
             NormalizedOrderEvent(
                 order_id=order_id,
@@ -245,6 +353,7 @@ def normalize_shopify_orders(
                 order_total=order_total,
                 refunded_amount=refunded_amount,
                 currency=currency,
+                line_items=line_items,
             )
         )
 

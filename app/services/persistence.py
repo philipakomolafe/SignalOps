@@ -1928,6 +1928,16 @@ def get_founder_post_pack_metrics(window_days: int = 7) -> Dict[str, Any]:
                 if features.get("week_over_week_revenue_change_pct") is not None
                 else None
             ),
+            "top_products_by_revenue": (
+                features.get("product_performance", {}).get("top_products_by_revenue", [])
+                if isinstance(features.get("product_performance"), dict)
+                else []
+            ),
+            "top_products_by_refund_rate": (
+                features.get("product_performance", {}).get("top_products_by_refund_rate", [])
+                if isinstance(features.get("product_performance"), dict)
+                else []
+            ),
             "based_on_run_id": based_on_run_id,
             "based_on_created_at": based_on_created_at,
         },
