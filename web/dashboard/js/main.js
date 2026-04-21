@@ -565,9 +565,18 @@ if (shopifySyncBtn) {
     try {
       const result = await runShopifyMonitorNow();
       setShopifyStatus(`Monitor complete. Analyses: ${result.triggered_analyses}.`);
-      await loadHistory();
+      const rows = await loadHistory();
       await loadShopifyStatus();
       await loadSevenDayPerformance();
+      if (result.triggered_analyses > 0 && Array.isArray(rows) && rows.length) {
+        const latestRunId = rows[0]?.run_id;
+        if (latestRunId && latestRunId !== currentRunId) {
+          const payload = await fetchAnalysisById(latestRunId);
+          showSingleAnalysis(payload);
+          switchSidebarSection("history");
+          setStatus(`Monitor complete. Opened latest run #${latestRunId}.`);
+        }
+      }
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
         localStorage.removeItem(TOKEN_STORAGE_KEY);

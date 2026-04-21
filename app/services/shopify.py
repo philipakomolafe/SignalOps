@@ -34,6 +34,45 @@ _NON_PROTECTED_ORDER_FIELDS = (
     "currency",
     "presentment_currency",
     "refunds",
+    "customer",
+    "line_items",
+)
+
+_NON_PROTECTED_CUSTOMER_FIELDS = (
+    "id",
+    "email",
+)
+
+_NON_PROTECTED_LINE_ITEM_FIELDS = (
+    "id",
+    "product_id",
+    "variant_id",
+    "sku",
+    "title",
+    "name",
+    "quantity",
+    "price",
+    "total_discount",
+)
+
+_NON_PROTECTED_REFUND_FIELDS = (
+    "transactions",
+    "refund_line_items",
+)
+
+_NON_PROTECTED_REFUND_TRANSACTION_FIELDS = (
+    "amount",
+)
+
+_NON_PROTECTED_REFUND_LINE_ITEM_FIELDS = (
+    "subtotal",
+    "quantity",
+    "line_item",
+)
+
+_NON_PROTECTED_REFUND_LINE_ITEM_NESTED_FIELDS = (
+    "id",
+    "price",
 )
 
 
@@ -62,7 +101,81 @@ def _sanitize_non_protected_orders(orders: List[Dict[str, Any]]) -> List[Dict[st
     allowed = set(_NON_PROTECTED_ORDER_FIELDS)
     sanitized: List[Dict[str, Any]] = []
     for order in orders:
-        sanitized.append({key: value for key, value in order.items() if key in allowed})
+        clean_order = {key: value for key, value in order.items() if key in allowed}
+
+        customer = clean_order.get("customer")
+        if isinstance(customer, dict):
+            clean_order["customer"] = {
+                key: value
+                for key, value in customer.items()
+                if key in _NON_PROTECTED_CUSTOMER_FIELDS
+            }
+
+        line_items = clean_order.get("line_items")
+        if isinstance(line_items, list):
+            clean_order["line_items"] = [
+                {
+                    key: value
+                    for key, value in line_item.items()
+                    if key in _NON_PROTECTED_LINE_ITEM_FIELDS
+                }
+                for line_item in line_items
+                if isinstance(line_item, dict)
+            ]
+
+        refunds = clean_order.get("refunds")
+        if isinstance(refunds, list):
+            sanitized_refunds: List[Dict[str, Any]] = []
+            for refund in refunds:
+                if not isinstance(refund, dict):
+                    continue
+
+                clean_refund = {
+                    key: value
+                    for key, value in refund.items()
+                    if key in _NON_PROTECTED_REFUND_FIELDS
+                }
+
+                transactions = clean_refund.get("transactions")
+                if isinstance(transactions, list):
+                    clean_refund["transactions"] = [
+                        {
+                            key: value
+                            for key, value in transaction.items()
+                            if key in _NON_PROTECTED_REFUND_TRANSACTION_FIELDS
+                        }
+                        for transaction in transactions
+                        if isinstance(transaction, dict)
+                    ]
+
+                refund_line_items = clean_refund.get("refund_line_items")
+                if isinstance(refund_line_items, list):
+                    sanitized_line_items: List[Dict[str, Any]] = []
+                    for refund_line_item in refund_line_items:
+                        if not isinstance(refund_line_item, dict):
+                            continue
+
+                        clean_refund_line_item = {
+                            key: value
+                            for key, value in refund_line_item.items()
+                            if key in _NON_PROTECTED_REFUND_LINE_ITEM_FIELDS
+                        }
+                        nested_line_item = clean_refund_line_item.get("line_item")
+                        if isinstance(nested_line_item, dict):
+                            clean_refund_line_item["line_item"] = {
+                                key: value
+                                for key, value in nested_line_item.items()
+                                if key in _NON_PROTECTED_REFUND_LINE_ITEM_NESTED_FIELDS
+                            }
+                        sanitized_line_items.append(clean_refund_line_item)
+
+                    clean_refund["refund_line_items"] = sanitized_line_items
+
+                sanitized_refunds.append(clean_refund)
+
+            clean_order["refunds"] = sanitized_refunds
+
+        sanitized.append(clean_order)
     return sanitized
 
 
@@ -115,6 +228,7 @@ def parse_oauth_state(state: str, max_age_seconds: int = 900) -> tuple[int, str]
         raise ValueError("OAuth state expired")
 
     return int(user_id_str), normalize_shop_domain(shop_domain)
+
 
 
 def build_install_url(shop_domain: str, state: str) -> str:
