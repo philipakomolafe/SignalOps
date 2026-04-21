@@ -304,11 +304,11 @@
 
 .settings-stack {
   display: grid;
-  gap: 6px;
-  border: 1px solid #d6deea;
-  border-radius: 9px;
-  background: #ffffff;
-  padding: 7px;
+  gap: 8px;
+  border: 1px solid #dbe4ef;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  padding: 12px;
 }
 
 .settings-stack h4 {
@@ -406,10 +406,10 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(15, 23, 42, 0.38);
+  background: rgba(15, 23, 42, 0.28);
   display: grid;
   place-items: center;
-  padding: 14px;
+  padding: 18px;
 }
 
 .settings-modal[hidden] {
@@ -417,24 +417,27 @@
 }
 
 .settings-modal-card {
-  width: min(560px, 96vw);
-  border-radius: 14px;
-  border: 1px solid #d5dfec;
-  background: #ffffff;
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.24);
-  padding: 12px;
+  width: min(440px, 92vw);
+  border-radius: 26px;
+  border: 1px solid rgba(214, 224, 238, 0.96);
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
+  padding: 16px;
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .settings-modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .settings-modal-head h2 {
-  font-size: 1rem;
+  font-family: "Manrope", sans-serif;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
 }
 
 .settings-close-btn {
@@ -450,6 +453,93 @@
 
 .settings-close-btn:hover {
   background: #f2f6fb;
+}
+
+.decision-pill-row,
+.run-signal-grid,
+.compact-run-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-pill-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.run-signal-grid,
+.compact-run-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.decision-pill {
+  border: 1px solid #d8e0ec;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px 11px;
+  min-width: 0;
+}
+
+.decision-pill.is-good {
+  background: linear-gradient(180deg, #f6fcf8 0%, #eef8f1 100%);
+  border-color: #cfe6d4;
+}
+
+.decision-pill.is-bad {
+  background: linear-gradient(180deg, #fff8f7 0%, #fff0ed 100%);
+  border-color: #eccfca;
+}
+
+.decision-pill-label {
+  display: block;
+  margin-bottom: 0.28rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #607086;
+}
+
+.decision-pill strong {
+  display: block;
+  font-family: "Manrope", sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.28;
+  color: #132234;
+  word-break: break-word;
+}
+
+.primary-decision-card {
+  border: 1px solid #d7deea;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f8fd 100%);
+  padding: 13px 14px;
+}
+
+.primary-decision-title {
+  font-family: "Manrope", sans-serif;
+  font-size: 1.04rem;
+  line-height: 1.15;
+  color: #172333;
+  margin: 0 0 0.35rem;
+}
+
+.primary-decision-text {
+  font-size: 0.9rem;
+  line-height: 1.52;
+  color: #334155;
+  max-width: 66ch;
+}
+
+.concise-findings {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.finding-brief.compact p {
+  display: none;
+}
+
+.finding-brief.compact .finding-brief-action {
+  margin-top: 0;
 }
 
 .feed-empty {
@@ -511,7 +601,7 @@
 
 .workspace-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .workspace-eyebrow {
@@ -533,9 +623,9 @@
 
 .workspace-subtitle {
   color: #4c5b70;
-  font-size: 0.93rem;
-  line-height: 1.52;
-  max-width: 72ch;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  max-width: 54ch;
 }
 
 .workspace-subsection {
@@ -567,7 +657,7 @@
 .action-list,
 .runs-overview-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .narrative-grid,
@@ -588,7 +678,7 @@
   border: 1px solid #d7deea;
   border-radius: 12px;
   background: #ffffff;
-  padding: 11px 12px;
+  padding: 10px 11px;
 }
 
 .narrative-card.is-good {
@@ -622,8 +712,8 @@
 .run-overview-card p,
 .action-card p,
 .finding-brief p {
-  font-size: 0.88rem;
-  line-height: 1.48;
+  font-size: 0.82rem;
+  line-height: 1.42;
   color: #1e2a39;
 }
 
@@ -704,7 +794,7 @@
 }
 
 .disclosure {
-  margin-top: 0.7rem;
+  margin-top: 0.45rem;
   border: 1px solid #d7deea;
   border-radius: 10px;
   background: #fbfdff;
@@ -718,7 +808,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: #f5f8fc;
   border-bottom: 1px solid transparent;
 }
@@ -751,9 +841,9 @@
 .findings-grid,
 .metrics-grid,
 .diagnosis-grid {
-  margin-top: 0.6rem;
+  margin-top: 0.35rem;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .metrics-grid {
@@ -845,7 +935,7 @@
   border: 1px solid #d8dde5;
   border-radius: 9px;
   background: #ffffff;
-  padding: 9px;
+  padding: 8px;
 }
 
 .diagnosis {
@@ -882,9 +972,9 @@
 
 .diagnosis p,
 .finding p {
-  font-size: 0.88rem;
+  font-size: 0.81rem;
   color: #1f2a3a;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .metrics-grid .metric {
@@ -1151,6 +1241,10 @@
   .narrative-grid,
   .monitor-grid,
   .action-list,
+  .decision-pill-row,
+  .run-signal-grid,
+  .compact-run-summary,
+  .concise-findings,
   .runs-overview-list,
   .metrics-grid,
   .diagnosis-grid,
@@ -1272,9 +1366,10 @@
   }
 
   .settings-modal-card {
-    width: 100%;
+    width: min(420px, 100%);
     max-height: 94vh;
     overflow-y: auto;
+    border-radius: 22px;
   }
 
   .run-btn {

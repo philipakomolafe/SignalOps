@@ -93,6 +93,29 @@ function narrativeCard(title, body, tone = "") {
   );
 }
 
+function decisionPill(label, value, tone = "") {
+  return el(
+    "article",
+    `decision-pill${tone ? ` is-${tone}` : ""}`,
+    `<span class="decision-pill-label">${label}</span><strong>${value}</strong>`
+  );
+}
+
+function conciseFindingCard(finding) {
+  const tone = String(finding?.severity || "medium").toLowerCase();
+  return el(
+    "article",
+    `finding-brief compact severity-${tone}`,
+    `
+      <div class="finding-brief-head">
+        <span class="severity">${finding.severity}</span>
+        <h3>${finding.title}</h3>
+      </div>
+      <div class="finding-brief-action">${finding.what_to_do || finding.what_changed || ""}</div>
+    `
+  );
+}
+
 function actionFormMarkup(buttonLabel = "Save Action") {
   return `
     <label class="label">What action did you take?</label>
@@ -234,10 +257,18 @@ export function renderUploadEvent(feed, fileName) {
 }
 
 export function renderAnalysis(feed, payload) {
-  const wrapper = el("article", "feed-message system");
+  return renderAnalysisCard(feed, payload, { compact: false });
+}
 
-  wrapper.appendChild(el("h3", "", "SignalOPs Analysis"));
-  wrapper.appendChild(el("p", "", payload.summary || ""));
+function renderAnalysisCard(feed, payload, { compact = false } = {}) {
+  const wrapper = el("article", "feed-message system");
+  const features = payload.features || {};
+  const findings = Array.isArray(payload.findings) ? payload.findings : [];
+
+  wrapper.appendChild(el("h3", "", compact ? "Run details" : "SignalOPs Analysis"));
+  if (!compact) {
+    wrapper.appendChild(el("p", "", payload.summary || ""));
+  }
   if (payload.run_id || payload.created_at || payload.source_file) {
     const metaText = [
       payload.run_id ? `Run #${payload.run_id}` : null,
@@ -247,20 +278,8 @@ export function renderAnalysis(feed, payload) {
     wrapper.appendChild(el("p", "", metaText));
   }
 
-  const diagnosisGrid = el("div", "diagnosis-grid");
-  diagnosisGrid.appendChild(diagnosis("What Changed", payload.diagnosis?.what_changed || "N/A"));
-  diagnosisGrid.appendChild(diagnosis("Likely Why", payload.diagnosis?.likely_why || "N/A"));
-  diagnosisGrid.appendChild(diagnosis("What To Do", payload.diagnosis?.what_to_do || "N/A"));
-  diagnosisGrid.appendChild(diagnosis("What To Watch Next", payload.diagnosis?.what_to_watch_next || "N/A"));
-  const diagnosisDisclosure = disclosure("Detailed diagnosis", "Expand for full narrative");
-  diagnosisDisclosure.appendChild(diagnosisGrid);
-  wrapper.appendChild(diagnosisDisclosure);
-
-  const features = payload.features || {};
   const metricsGrid = el("div", "metrics-grid");
   metricsGrid.appendChild(metric("Total Revenue", formatCurrency(features.total_revenue || 0)));
-  metricsGrid.appendChild(metric("Revenue/User", formatCurrency(features.revenue_per_user || 0)));
-  metricsGrid.appendChild(metric("Purchase Frequency", Number(features.purchase_frequency || 0).toFixed(2)));
   metricsGrid.appendChild(metric("Repeat Rate", formatPct(features.repeat_rate || 0)));
   metricsGrid.appendChild(metric("Refund Rate", formatPct(features.refund_rate || 0)));
   metricsGrid.appendChild(metric(
@@ -269,7 +288,41 @@ export function renderAnalysis(feed, payload) {
       ? "N/A"
       : formatPct(features.week_over_week_revenue_change_pct)
   ));
+  if (!compact) {
+    metricsGrid.appendChild(metric("Revenue/User", formatCurrency(features.revenue_per_user || 0)));
+    metricsGrid.appendChild(metric("Purchase Frequency", Number(features.purchase_frequency || 0).toFixed(2)));
+  }
   wrapper.appendChild(metricsGrid);
+
+  if (!compact) {
+    const diagnosisGrid = el("div", "diagnosis-grid");
+    diagnosisGrid.appendChild(diagnosis("What Changed", payload.diagnosis?.what_changed || "N/A"));
+    diagnosisGrid.appendChild(diagnosis("Likely Why", payload.diagnosis?.likely_why || "N/A"));
+    diagnosisGrid.appendChild(diagnosis("What To Do", payload.diagnosis?.what_to_do || "N/A"));
+    diagnosisGrid.appendChild(diagnosis("What To Watch Next", payload.diagnosis?.what_to_watch_next || "N/A"));
+    const diagnosisDisclosure = disclosure("Detailed diagnosis", "Expand for full narrative");
+    diagnosisDisclosure.appendChild(diagnosisGrid);
+    wrapper.appendChild(diagnosisDisclosure);
+  } else {
+    const compactSummary = el("div", "compact-run-summary");
+    compactSummary.appendChild(
+      decisionPill(
+        "Primary call",
+        findings.length ? String(findings[0].title || "Leak detected") : "Stable",
+        findings.length ? "bad" : "good"
+      )
+    );
+    compactSummary.appendChild(
+      decisionPill(
+        "Do next",
+        findings.length
+          ? String(findings[0].what_to_do || "Act on the primary leak")
+          : "Keep monitoring",
+        "neutral"
+      )
+    );
+    wrapper.appendChild(compactSummary);
+  }
 
   const productPerformance = renderProductPerformance(features);
   if (productPerformance) {
@@ -277,7 +330,6 @@ export function renderAnalysis(feed, payload) {
   }
 
   const findingsGrid = el("div", "findings-grid");
-  const findings = Array.isArray(payload.findings) ? payload.findings : [];
   if (findings.length === 0) {
     findingsGrid.appendChild(el("article", "finding", `<span class="severity">Stable</span><p>No critical leaks detected by current rules.</p>`));
   } else {
@@ -293,7 +345,7 @@ export function renderAnalysis(feed, payload) {
   }
 
   const findingsDisclosure = disclosure(
-    "Leak findings",
+    compact ? "Leak details" : "Leak findings",
     findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "No critical leaks"
   );
   findingsDisclosure.appendChild(findingsGrid);
@@ -319,7 +371,7 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
 
   const wrapper = workspaceSection(
     "Latest leak brief",
-    "Open the latest run first. This is the fastest way to see what changed and what to fix next."
+    "Direct signals for what needs attention now."
   );
 
   if (uploadedFileName) {
@@ -336,25 +388,63 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
     const findings = Array.isArray(analysis.findings) ? analysis.findings : [];
     const criticalCount = findings.filter((item) => String(item.severity).toLowerCase() === "critical").length;
     const highCount = findings.filter((item) => String(item.severity).toLowerCase() === "high").length;
+    const topFinding = findings[0] || null;
+    const wow = analysis.features?.week_over_week_revenue_change_pct;
+    const repeatRate = analysis.features?.repeat_rate;
+    const refundRate = analysis.features?.refund_rate;
 
-    const grid = el("div", "metrics-grid workspace-metrics");
-    grid.appendChild(metric("Run", analysis.run_id ? `#${analysis.run_id}` : "Latest"));
-    grid.appendChild(metric("Findings", String(findings.length)));
-    grid.appendChild(metric("Critical / High", `${criticalCount} / ${highCount}`));
-    grid.appendChild(metric("Source", analysis.source_file || "Unknown"));
-    grid.appendChild(metric("Created", formatShortDate(analysis.created_at)));
-    grid.appendChild(metric("Segment", analysis.segment || "Shopify"));
-    wrapper.appendChild(grid);
+    const pillRow = el("div", "decision-pill-row");
+    pillRow.appendChild(decisionPill("Run", analysis.run_id ? `#${analysis.run_id}` : "Latest", "neutral"));
+    pillRow.appendChild(decisionPill("Created", formatShortDate(analysis.created_at), "neutral"));
+    pillRow.appendChild(decisionPill("Source", analysis.source_file || "Unknown", "neutral"));
+    wrapper.appendChild(pillRow);
 
-    wrapper.appendChild(
-      narrativeCard(
-        "Run summary",
-        analysis.summary || "No summary available for this run.",
+    const signalGrid = el("div", "run-signal-grid");
+    signalGrid.appendChild(
+      decisionPill(
+        "Findings",
+        findings.length ? `${findings.length} active` : "Clear",
         findings.length ? "bad" : "good"
       )
     );
+    signalGrid.appendChild(
+      decisionPill("Critical / High", `${criticalCount} / ${highCount}`, criticalCount || highCount ? "bad" : "neutral")
+    );
+    signalGrid.appendChild(
+      decisionPill(
+        "WoW",
+        wow === null || wow === undefined ? "N/A" : formatTrend(wow),
+        wow !== null && wow !== undefined && Number(wow) < -10 ? "bad" : "neutral"
+      )
+    );
+    signalGrid.appendChild(
+      decisionPill("Repeat", repeatRate === null || repeatRate === undefined ? "N/A" : formatPct(repeatRate), "neutral")
+    );
+    signalGrid.appendChild(
+      decisionPill("Refund", refundRate === null || refundRate === undefined ? "N/A" : formatPct(refundRate), "neutral")
+    );
+    signalGrid.appendChild(decisionPill("Segment", analysis.segment || "Shopify", "neutral"));
+    wrapper.appendChild(signalGrid);
 
-    appendTopFindingCards(wrapper, findings);
+    const primary = el("section", "primary-decision-card");
+    primary.appendChild(textEl("span", "narrative-kicker", "Decision now"));
+    primary.appendChild(textEl("h3", "primary-decision-title", topFinding ? topFinding.title : "No urgent leak"));
+    primary.appendChild(
+      textEl(
+        "p",
+        "primary-decision-text",
+        topFinding
+          ? (topFinding.what_to_do || topFinding.what_changed || analysis.summary || "")
+          : "No critical leak is active in this run. Keep the current plan and monitor the next cycle."
+      )
+    );
+    wrapper.appendChild(primary);
+
+    if (findings.length) {
+      const conciseGrid = el("div", "narrative-grid concise-findings");
+      findings.slice(0, 3).forEach((finding) => conciseGrid.appendChild(conciseFindingCard(finding)));
+      wrapper.appendChild(conciseGrid);
+    }
   } else {
     wrapper.appendChild(
       narrativeCard(
@@ -368,7 +458,7 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
   feed.appendChild(wrapper);
 
   if (analysis) {
-    renderAnalysis(feed, analysis);
+    renderAnalysisCard(feed, analysis, { compact: true });
   }
 }
 
