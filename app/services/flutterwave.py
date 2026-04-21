@@ -95,7 +95,9 @@ def parse_tx_ref_user_id(tx_ref: str | None) -> int | None:
     except (TypeError, ValueError):
         return None
 
-
+# used when you want to initialize a payment for a subscription plan, 
+# which will redirect the user to Flutterwave's hosted payment page. 
+# The function constructs the required payload and makes an API call to Flutterwave's payment initialization endpoint.
 def initialize_subscription_payment(
     *,
     tx_ref: str,

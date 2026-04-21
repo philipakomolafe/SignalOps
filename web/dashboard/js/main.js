@@ -14,12 +14,13 @@ import {
 } from "./api.js";
 import { TOKEN_STORAGE_KEY } from "./config.js";
 import {
-  renderAnalysis,
   renderHistoryList,
+  renderRunsWorkspace,
+  renderStoreWorkspace,
+  renderActionWorkspace,
   renderSidebarActionFeedback,
   renderSidebarPerformance,
   renderUploadEvent,
-  resetFeed,
 } from "./render.js";
 
 const feed = document.getElementById("analysis-feed");
@@ -53,9 +54,16 @@ const upgradeLinkEl = document.getElementById("upgrade-link");
 const openSettingsBtn = document.getElementById("open-settings-btn");
 const settingsModalEl = document.getElementById("settings-modal");
 const settingsCloseBtn = document.getElementById("settings-close-btn");
+const workspaceHeadingEl = document.querySelector(".workspace-title h1");
+const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
 let currentRunId = null;
 let latestPerformancePayload = null;
+let latestHistoryRows = [];
+let activeAnalysisPayload = null;
+let latestShopifyStatus = null;
+let currentSection = "history";
+let lastUploadedFileName = "";
 
 function runIdToConversationId(runId) {
   const numeric = Number(runId);
@@ -178,6 +186,7 @@ function setShopifyButtonsDisabled(disabled) {
 
 function switchSidebarSection(sectionName) {
   const next = String(sectionName || "history").toLowerCase();
+  currentSection = next;
   const sectionMap = {
     history: sidebarHistorySectionEl,
     performance: sidebarPerformanceSectionEl,
@@ -193,12 +202,70 @@ function switchSidebarSection(sectionName) {
     const isActive = button.getAttribute("data-section") === next;
     button.classList.toggle("active", isActive);
   });
+
+  updateWorkspaceHeader(next);
+  renderWorkspaceSection();
 }
 
 function renderSidebarInsights() {
   if (!latestPerformancePayload) return;
-  renderSidebarPerformance(sidebarPerformanceContentEl, latestPerformancePayload);
-  renderSidebarActionFeedback(sidebarFeedbackContentEl, latestPerformancePayload);
+  renderSidebarPerformance(
+    sidebarPerformanceContentEl,
+    latestPerformancePayload,
+    activeAnalysisPayload,
+    latestShopifyStatus
+  );
+  renderSidebarActionFeedback(
+    sidebarFeedbackContentEl,
+    latestPerformancePayload,
+    activeAnalysisPayload
+  );
+}
+
+function updateWorkspaceHeader(sectionName) {
+  if (!workspaceHeadingEl || !workspaceSubtitleEl) return;
+
+  if (sectionName === "performance") {
+    workspaceHeadingEl.textContent = "Store Workspace";
+    workspaceSubtitleEl.textContent = "Track momentum, retention, refunds, and monitoring state in one operating view.";
+    return;
+  }
+
+  if (sectionName === "feedback") {
+    workspaceHeadingEl.textContent = "Action Workspace";
+    workspaceSubtitleEl.textContent = "Turn leak signals into deliberate actions, then record and assess the impact.";
+    return;
+  }
+
+  workspaceHeadingEl.textContent = "Analysis Workspace";
+  workspaceSubtitleEl.textContent = "Open the latest run, inspect the leak brief, and compare recent analysis activity.";
+}
+
+function renderWorkspaceSection() {
+  if (!feed) return;
+
+  if (currentSection === "performance") {
+    renderStoreWorkspace(feed, {
+      performance: latestPerformancePayload,
+      analysis: activeAnalysisPayload,
+      shopifyStatus: latestShopifyStatus,
+    });
+    return;
+  }
+
+  if (currentSection === "feedback") {
+    renderActionWorkspace(feed, {
+      performance: latestPerformancePayload,
+      analysis: activeAnalysisPayload,
+    });
+    return;
+  }
+
+  renderRunsWorkspace(feed, {
+    analysis: activeAnalysisPayload,
+    historyRows: latestHistoryRows,
+    uploadedFileName: lastUploadedFileName,
+  });
 }
 
 function openSettingsModal() {
@@ -214,8 +281,11 @@ function closeSettingsModal() {
 async function loadShopifyStatus() {
   try {
     const status = await fetchShopifyStatus();
+    latestShopifyStatus = status;
     if (!status.connected) {
       setShopifyStatus("No Shopify connection yet.");
+      renderSidebarInsights();
+      renderWorkspaceSection();
       return;
     }
 
@@ -225,24 +295,29 @@ async function loadShopifyStatus() {
 
     const synced = status.last_synced_at ? ` Last sync: ${status.last_synced_at}.` : "";
     setShopifyStatus(`Connected: ${status.shop_domain || "store"}.${synced}`);
+    renderSidebarInsights();
+    renderWorkspaceSection();
   } catch (error) {
     if (error.message === "AUTH_REQUIRED") {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       redirectToLogin();
       return;
     }
+    latestShopifyStatus = null;
     setShopifyStatus(error.message || "Failed to fetch Shopify status.", true);
   }
 }
 
 function showSingleAnalysis(payload, fileName = null) {
-  resetFeed(feed);
-  if (fileName) {
-    renderUploadEvent(feed, fileName);
+  activeAnalysisPayload = payload;
+  lastUploadedFileName = fileName || "";
+  renderWorkspaceSection();
+  if (currentSection === "history" && feed) {
+    feed.scrollTop = 0;
   }
-  renderAnalysis(feed, payload);
-  feed.scrollTop = feed.scrollHeight;
   currentRunId = payload?.run_id ?? null;
+  renderHistoryList(historyListEl, latestHistoryRows, handleHistoryRunOpen, currentRunId);
+  renderSidebarInsights();
   if (currentRunId) {
     updateConversationUrl(currentRunId);
   }
@@ -253,6 +328,7 @@ async function loadSevenDayPerformance() {
     const payload = await fetchUserPerformance(7);
     latestPerformancePayload = payload;
     renderSidebarInsights();
+    renderWorkspaceSection();
   } catch (error) {
     if (error.message === "AUTH_REQUIRED") {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -263,35 +339,44 @@ async function loadSevenDayPerformance() {
   }
 }
 
-async function loadHistory() {
+async function handleHistoryRunOpen(runId) {
+  if (currentRunId === runId) {
+    setStatus(`Run #${runId} is already open.`);
+    return;
+  }
+  setStatus(`Loading run #${runId}...`);
   try {
-    const rows = await fetchAnalysisHistory(20);
-    renderHistoryList(historyListEl, rows, async (runId) => {
-      if (currentRunId === runId) {
-        setStatus(`Run #${runId} is already open.`);
-        return;
-      }
-      setStatus(`Loading run #${runId}...`);
-      try {
-        const payload = await fetchAnalysisById(runId);
-        showSingleAnalysis(payload);
-        setStatus(`Loaded run #${runId}.`);
-      } catch (error) {
-        if (error.message === "AUTH_REQUIRED") {
-          localStorage.removeItem(TOKEN_STORAGE_KEY);
-          redirectToLogin();
-          return;
-        }
-        setStatus(error.message || "Failed to load saved analysis.", true);
-      }
-    });
+    const payload = await fetchAnalysisById(runId);
+    showSingleAnalysis(payload);
+    setStatus(`Loaded run #${runId}.`);
   } catch (error) {
     if (error.message === "AUTH_REQUIRED") {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       redirectToLogin();
       return;
     }
+    setStatus(error.message || "Failed to load saved analysis.", true);
+  }
+}
+
+async function loadHistory() {
+  try {
+    const rows = await fetchAnalysisHistory(20);
+    latestHistoryRows = Array.isArray(rows) ? rows : [];
+    renderHistoryList(historyListEl, latestHistoryRows, handleHistoryRunOpen, currentRunId);
+    renderWorkspaceSection();
+    return latestHistoryRows;
+  } catch (error) {
+    if (error.message === "AUTH_REQUIRED") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
+      return;
+    }
+    latestHistoryRows = [];
+    renderHistoryList(historyListEl, latestHistoryRows, handleHistoryRunOpen, currentRunId);
+    renderWorkspaceSection();
     setStatus(error.message || "Failed to load history.", true);
+    return [];
   }
 }
 
@@ -333,8 +418,12 @@ if (form) {
 
     setRunningState(true);
     currentRunId = null;
-    resetFeed(feed);
-    renderUploadEvent(feed, file.name);
+    activeAnalysisPayload = null;
+    lastUploadedFileName = file.name;
+    renderWorkspaceSection();
+    if (currentSection === "history") {
+      renderUploadEvent(feed, file.name);
+    }
     setStatus("Running analysis...");
 
     try {
@@ -360,42 +449,41 @@ if (form) {
   });
 }
 
-if (sidebarFeedbackContentEl) {
-  sidebarFeedbackContentEl.addEventListener("submit", async (event) => {
-    const formEl = event.target;
-    if (!(formEl instanceof HTMLFormElement)) return;
-    if (formEl.id !== "action-feedback-form") return;
-    event.preventDefault();
+document.addEventListener("submit", async (event) => {
+  const formEl = event.target;
+  if (!(formEl instanceof HTMLFormElement)) return;
+  if (!formEl.matches("[data-action-feedback-form='true']")) return;
+  event.preventDefault();
 
-    const actionTaken = String(formEl.action_taken?.value || "").trim();
-    const actionDate = String(formEl.action_date?.value || "").trim();
-    const outcome = String(formEl.self_reported_outcome?.value || "").trim().toLowerCase();
+  const formData = new FormData(formEl);
+  const actionTaken = String(formData.get("action_taken") || "").trim();
+  const actionDate = String(formData.get("action_date") || "").trim();
+  const outcome = String(formData.get("self_reported_outcome") || "").trim().toLowerCase();
 
-    if (!actionTaken || !actionDate) {
-      setStatus("Please provide action and date.", true);
+  if (!actionTaken || !actionDate) {
+    setStatus("Please provide action and date.", true);
+    return;
+  }
+
+  const submitBtn = formEl.querySelector(".action-feedback-submit");
+  if (submitBtn) submitBtn.disabled = true;
+
+  setStatus("Saving action feedback...");
+  try {
+    await submitActionFeedback(actionTaken, actionDate, outcome);
+    await loadSevenDayPerformance();
+    setStatus("Action feedback saved. Impact will update as new runs come in.");
+  } catch (error) {
+    if (error.message === "AUTH_REQUIRED") {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
       return;
     }
-
-    const submitBtn = formEl.querySelector("#action-feedback-submit");
-    if (submitBtn) submitBtn.disabled = true;
-
-    setStatus("Saving action feedback...");
-    try {
-      await submitActionFeedback(actionTaken, actionDate, outcome);
-      await loadSevenDayPerformance();
-      setStatus("Action feedback saved. Impact will update as new runs come in.");
-    } catch (error) {
-      if (error.message === "AUTH_REQUIRED") {
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-        redirectToLogin();
-        return;
-      }
-      setStatus(error.message || "Failed to save action feedback.", true);
-    } finally {
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
-}
+    setStatus(error.message || "Failed to save action feedback.", true);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+});
 
 if (fileInput) {
   fileInput.addEventListener("change", () => {
@@ -564,9 +652,9 @@ async function bootstrap() {
       userNameEl.textContent = me.full_name || fallbackName;
     }
 
-    switchSidebarSection("history");
+    updateWorkspaceHeader("history");
     await loadSevenDayPerformance();
-    await loadHistory();
+    const rows = await loadHistory();
     await loadShopifyStatus();
     await loadAccountPlanAndBillingUi();
 
@@ -582,6 +670,15 @@ async function bootstrap() {
           setStatus("Conversation URL is invalid or no longer available.", true);
         }
       }
+    } else if ((!activeAnalysisPayload || !currentRunId) && Array.isArray(rows) && rows.length) {
+      try {
+        const payload = await fetchAnalysisById(rows[0].run_id);
+        showSingleAnalysis(payload);
+      } catch (_error) {
+        renderWorkspaceSection();
+      }
+    } else {
+      renderWorkspaceSection();
     }
   } catch (_error) {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
