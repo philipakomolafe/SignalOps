@@ -9,6 +9,7 @@ import {
   fetchShopifyStatus,
   logout,
   runShopifyMonitorNow,
+  sendWeeklyReportNow,
   startShopifyConnect,
   submitActionFeedback,
 } from "./api.js";
@@ -40,6 +41,7 @@ const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
 const shopifyDisconnectBtn = document.getElementById("shopify-disconnect-btn");
 const shopifySyncBtn = document.getElementById("shopify-sync-btn");
+const weeklyReportBtn = document.getElementById("weekly-report-btn");
 const shopifyStatusEl = document.getElementById("shopify-status");
 
 const sidebarPerformanceContentEl = document.getElementById("sidebar-performance-content");
@@ -179,7 +181,7 @@ function setShopifyStatus(message, isError = false) {
 }
 
 function setShopifyButtonsDisabled(disabled) {
-  [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn].forEach((button) => {
+  [shopifyConnectBtn, shopifyDisconnectBtn, shopifySyncBtn, weeklyReportBtn].forEach((button) => {
     if (button) button.disabled = disabled;
   });
 }
@@ -190,13 +192,17 @@ function switchSidebarSection(sectionName) {
   const sectionMap = {
     history: sidebarHistorySectionEl,
     performance: sidebarPerformanceSectionEl,
-    feedback: sidebarFeedbackSectionEl,
+    feedback: null,
   };
 
   Object.entries(sectionMap).forEach(([key, section]) => {
     if (!section) return;
     section.hidden = key !== next;
   });
+
+  if (sidebarFeedbackSectionEl) {
+    sidebarFeedbackSectionEl.hidden = true;
+  }
 
   sidebarNavEls.forEach((button) => {
     const isActive = button.getAttribute("data-section") === next;
@@ -584,6 +590,27 @@ if (shopifySyncBtn) {
         return;
       }
       setShopifyStatus(error.message || "Failed to run monitor.", true);
+    } finally {
+      setShopifyButtonsDisabled(false);
+    }
+  });
+}
+
+if (weeklyReportBtn) {
+  weeklyReportBtn.addEventListener("click", async () => {
+    setShopifyButtonsDisabled(true);
+    setShopifyStatus("Sending weekly report...");
+    try {
+      const result = await sendWeeklyReportNow();
+      setShopifyStatus(`Weekly report sent to ${result.recipient}.`);
+      setStatus(`Weekly report sent to ${result.recipient}.`);
+    } catch (error) {
+      if (error.message === "AUTH_REQUIRED") {
+        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        redirectToLogin();
+        return;
+      }
+      setShopifyStatus(error.message || "Failed to send weekly report.", true);
     } finally {
       setShopifyButtonsDisabled(false);
     }

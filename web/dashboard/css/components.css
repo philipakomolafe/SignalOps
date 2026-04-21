@@ -347,7 +347,8 @@
 
 #shopify-connect-btn,
 #shopify-disconnect-btn,
-#shopify-sync-btn {
+#shopify-sync-btn,
+#weekly-report-btn {
   width: 100%;
   border: 1px solid #cfd8e3;
   background: #fff;
@@ -361,13 +362,19 @@
 
 #shopify-connect-btn:hover,
 #shopify-disconnect-btn:hover,
-#shopify-sync-btn:hover {
+#shopify-sync-btn:hover,
+#weekly-report-btn:hover {
   background: #f2f6fb;
 }
 
 #shopify-sync-btn {
   background: #eef4ff;
   border-color: #c6d5f6;
+}
+
+#weekly-report-btn {
+  background: #fff8ee;
+  border-color: #ead9bb;
 }
 
 .settings-note {

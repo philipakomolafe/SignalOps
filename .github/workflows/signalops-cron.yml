@@ -6,6 +6,8 @@ on:
     - cron: "*/30 * * * *"
     # Run retention cleanup once daily at 03:17 UTC.
     - cron: "17 3 * * *"
+    # Send weekly SignalOps reports every Monday at 08:00 UTC.
+    - cron: "0 8 * * 1"
   workflow_dispatch:
     inputs:
       run_monitor:
@@ -18,6 +20,11 @@ on:
         required: false
         type: boolean
         default: true
+      run_weekly_reports:
+        description: "Send weekly report emails"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   scheduled-api-jobs:
@@ -57,5 +64,16 @@ jobs:
         run: |
           curl --fail --show-error --silent \
             -X POST "${SIGNALOPS_BASE_URL%/}/api/v1/maintenance/data-retention/run" \
+            -H "x-monitor-token: ${SIGNALOPS_MONITOR_TOKEN}" \
+            -H "Content-Type: application/json"
+
+      - name: Run weekly report email endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_weekly_reports || github.event_name == 'schedule' && github.event.schedule == '0 8 * * 1' }}
+        env:
+          SIGNALOPS_BASE_URL: ${{ secrets['SIGNALOPS_BASE_URL'] }}
+          SIGNALOPS_MONITOR_TOKEN: ${{ secrets['SIGNALOPS_MONITOR_TOKEN'] }}
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${SIGNALOPS_BASE_URL%/}/api/v1/reports/weekly/send-all" \
             -H "x-monitor-token: ${SIGNALOPS_MONITOR_TOKEN}" \
             -H "Content-Type: application/json"

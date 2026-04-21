@@ -365,30 +365,6 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
     );
   }
 
-  if (Array.isArray(historyRows) && historyRows.length) {
-    const recent = el("section", "workspace-subsection");
-    recent.appendChild(textEl("h3", "workspace-subheading", "Recent run activity"));
-    const list = el("div", "runs-overview-list");
-    historyRows.slice(0, 5).forEach((row) => {
-      list.appendChild(
-        el(
-          "article",
-          "run-overview-card",
-          `
-            <div class="run-overview-head">
-              <strong>#${row.run_id}</strong>
-              <span>${formatShortDate(row.created_at)}</span>
-            </div>
-            <h4>${row.source_file || "CSV upload"}</h4>
-            <p>${row.summary || "No summary available."}</p>
-          `
-        )
-      );
-    });
-    recent.appendChild(list);
-    wrapper.appendChild(recent);
-  }
-
   feed.appendChild(wrapper);
 
   if (analysis) {
@@ -609,48 +585,7 @@ export function renderSidebarPerformance(container, payload, analysis = null, sh
 
 export function renderSidebarActionFeedback(container, payload, analysis = null) {
   if (!container) return;
-
-  const feedback = payload && payload.action_feedback ? payload.action_feedback : null;
-  const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
-  const status = feedback?.impact_label || (feedback ? "Pending" : "Not started");
-
   container.innerHTML = "";
-  container.appendChild(el("p", "sidebar-note", `Status: ${status}`));
-  if (findings.length) {
-    const topFinding = [...findings].sort((left, right) => severityRank(right.severity) - severityRank(left.severity))[0];
-    container.appendChild(
-      el(
-        "p",
-        "sidebar-note",
-        `<strong>Next best move:</strong> ${topFinding.what_to_do || topFinding.title}`
-      )
-    );
-  }
-
-  if (feedback) {
-    const impactLabel = feedback.impact_label || "Pending";
-    container.appendChild(
-      el(
-        "p",
-        "feedback-inline-meta",
-        `<strong>Latest:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> <span class="impact-chip">${impactLabel}</span>`
-      )
-    );
-    if (feedback.impact_note) {
-      container.appendChild(el("p", "sidebar-note", feedback.impact_note));
-    }
-  } else {
-    container.appendChild(el("p", "sidebar-note", "No action feedback yet."));
-  }
-
-  container.appendChild(
-    el(
-      "form",
-      "sidebar-feedback-form action-feedback-form",
-      actionFormMarkup("Save")
-    )
-  );
-  container.querySelector("form")?.setAttribute("data-action-feedback-form", "true");
 }
 
 export function clearEmptyState(feed, empty) {

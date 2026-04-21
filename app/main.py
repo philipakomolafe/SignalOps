@@ -101,7 +101,7 @@ from app.services.persistence import (
 )
 # Report builder that converts findings into summary + diagnosis text.
 from app.services.report_generator import build_report
-from app.services.resend_mailer import send_password_reset_email
+from app.services.resend_mailer import send_weekly_report_email, send_password_reset_email
 from app.services.flutterwave import (
     is_valid_webhook_signature,
     make_tx_ref,
@@ -609,6 +609,38 @@ def _build_action_feedback_item(user_id: int, row: dict | None) -> ActionFeedbac
     )
 
 
+def _build_weekly_report_payload(user_id: int) -> tuple[dict, dict | None, ActionFeedbackItem | None, dict | None]:
+    """Build weekly report data from existing persisted user signals."""
+    points = get_user_feature_timeseries(user_id=user_id, window_days=7)
+    summary = _combine_feature_points(points).model_dump()
+    history = list_analyses(user_id=user_id, limit=1)
+    analysis = get_analysis(run_id=int(history[0]["run_id"]), user_id=user_id) if history else None
+    feedback = _build_action_feedback_item(user_id=user_id, row=get_latest_action_feedback(user_id))
+    shopify_connection = get_shopify_connection_by_user(user_id)
+    return summary, analysis, feedback, shopify_connection
+
+
+def _send_weekly_report_for_user(user_id: int) -> tuple[str, str | None]:
+    """Send weekly report email for one user and return recipient metadata."""
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found for weekly report")
+
+    summary, analysis, feedback, shopify_connection = _build_weekly_report_payload(user_id)
+    if not analysis and not any(summary.values()):
+        raise HTTPException(status_code=404, detail="No reportable analysis data found yet")
+
+    send_weekly_report_email(
+        to_email=str(user["email"]),
+        full_name=str(user.get("full_name") or ""),
+        summary=summary,
+        analysis=analysis,
+        action_feedback=feedback.model_dump() if feedback else None,
+        shop_domain=(shopify_connection or {}).get("shop_domain"),
+    )
+    return str(user["email"]), (shopify_connection or {}).get("shop_domain")
+
+
 @app.get("/api/v1/srl/performance", response_model=UserPerformanceResponse)
 def user_performance(
     days: int = Query(default=7, ge=1, le=30),
@@ -649,6 +681,50 @@ def submit_action_feedback(
     if not built:
         raise HTTPException(status_code=500, detail="Failed to save action feedback")
     return built
+
+
+@app.post("/api/v1/reports/weekly/send")
+def send_my_weekly_report(current_user: dict = Depends(get_current_user)) -> dict:
+    """Send the authenticated user's weekly report email immediately."""
+    recipient, shop_domain = _send_weekly_report_for_user(int(current_user["user_id"]))
+    return {
+        "status": "sent",
+        "recipient": recipient,
+        "shop_domain": shop_domain,
+    }
+
+
+@app.post("/api/v1/reports/weekly/send-all")
+def send_all_weekly_reports(x_monitor_token: str | None = Header(default=None)) -> dict:
+    """Send weekly reports for users with active Shopify connections."""
+    if not settings.monitor_internal_token or x_monitor_token != settings.monitor_internal_token:
+        raise HTTPException(status_code=401, detail="Invalid monitor token")
+
+    sent = 0
+    failed = 0
+    recipients: list[str] = []
+    seen_user_ids: set[int] = set()
+
+    for connection in list_active_shopify_connections(limit=500):
+        user_id = int(connection["user_id"])
+        if user_id in seen_user_ids:
+            continue
+        seen_user_ids.add(user_id)
+
+        try:
+            recipient, _shop_domain = _send_weekly_report_for_user(user_id)
+            sent += 1
+            recipients.append(recipient)
+        except Exception:
+            failed += 1
+            logger.exception("Weekly report send failed for user_id=%s", user_id)
+
+    return {
+        "status": "ok",
+        "sent": sent,
+        "failed": failed,
+        "recipients": recipients,
+    }
 
 
 @app.post("/api/v1/payments/flutterwave/webhook")

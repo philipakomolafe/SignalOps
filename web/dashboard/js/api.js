@@ -10,6 +10,7 @@ const SHOPIFY_MONITOR_NOW_ENDPOINT = `${API_BASE}/api/v1/integrations/shopify/mo
 const ACCOUNT_PLAN_ENDPOINT = `${API_BASE}/api/v1/account/plan`;
 const USER_PERFORMANCE_ENDPOINT = `${API_BASE}/api/v1/srl/performance`;
 const ACTION_FEEDBACK_ENDPOINT = `${API_BASE}/api/v1/srl/action-feedback`;
+const WEEKLY_REPORT_ENDPOINT = `${API_BASE}/api/v1/reports/weekly/send`;
 
 function authHeaders(extraHeaders = {}) {
   const token = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -134,4 +135,12 @@ export async function submitActionFeedback(actionTaken, actionDate, selfReported
     }),
   });
   return parseResponse(response, "Failed to save action feedback.");
+}
+
+export async function sendWeeklyReportNow() {
+  const response = await fetch(WEEKLY_REPORT_ENDPOINT, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return parseResponse(response, "Failed to send weekly report.");
 }
