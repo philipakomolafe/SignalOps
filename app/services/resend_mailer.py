@@ -166,9 +166,9 @@ def send_weekly_report_email(
     html = f"""
     <div style="margin:0;background:#f5f7fb;padding:24px 12px;font-family:Arial,sans-serif;">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #dbe4ef;border-radius:18px;overflow:hidden;">
-        <div style="padding:24px 24px 18px;background:linear-gradient(180deg,#f8fbff 0%,#edf4ff 100%);border-bottom:1px solid #dbe4ef;">
-          {'<div style="display:inline-block;margin:0 0 14px;border-radius:12px;overflow:hidden;background:#ffffff;border:1px solid #dbe4ef;padding:6px 8px;"><img src="' + logo_url + '" alt="SignalOps" style="height:36px;width:auto;display:block;border-radius:8px;" /></div>' if logo_url else ''}
-          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;">Weekly Report</div>
+        <div style="padding:24px 24px 18px;background:linear-gradient(180deg,#f8fbff 0%,#edf4ff 100%);border-bottom:1px solid #dbe4ef;text-align:center;">
+          {'<div style="display:inline-block;margin:0 auto 14px;border-radius:12px;overflow:hidden;background:#ffffff;border:1px solid #dbe4ef;padding:6px 8px;"><img src="' + logo_url + '" alt="SignalOps" style="height:36px;width:auto;display:block;border-radius:8px;" /></div>' if logo_url else ''}
+          <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;text-align:center;">Weekly Report</div>
           <h1 style="margin:8px 0 10px;font-size:28px;line-height:1.15;color:#0f172a;">SignalOps weekly leak brief for {escape(store_label)}</h1>
           <p style="margin:0;font-size:15px;line-height:1.6;color:#334155;">Hi {escape(recipient_name)}, here is your weekly store report with the current demand, retention, refund, and product signals.</p>
         </div>
