@@ -249,6 +249,7 @@
 }
 
 .sidebar-user {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #f8fafc;
@@ -277,28 +278,103 @@
   background: #f5f8fc;
 }
 
-#user-name {
+.user-meta {
+  min-width: 0;
+}
+
+#user-name,
+#user-popover-name {
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.user-meta small {
+  display: block;
+  margin-top: 1px;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
 .user-avatar {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.86rem;
+  height: 0.86rem;
   border-radius: 999px;
   background: #374151;
   border: 1px solid #9ca3af;
   flex: 0 0 auto;
 }
 
-.user-actions {
+.user-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 26;
   display: grid;
   gap: 6px;
+  border: 1px solid #d4deea;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+  padding: 8px;
 }
 
-.user-actions[hidden] {
+.user-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px 8px;
+  border-bottom: 1px solid #e3e9f2;
+}
+
+.user-popover-head .user-avatar {
+  width: 1rem;
+  height: 1rem;
+}
+
+.user-popover-head small {
+  display: block;
+  margin-top: 1px;
+  color: #64748b;
+  font-size: 0.68rem;
+}
+
+.user-popover-list {
+  display: grid;
+  gap: 4px;
+}
+
+.user-popover-list button,
+.user-popover-logout {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #1f2937;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 0.77rem;
+  font-weight: 600;
+  padding: 6px 7px;
+  cursor: pointer;
+}
+
+.user-popover-list button:hover,
+.user-popover-logout:hover {
+  border-color: #d5deea;
+  background: #f5f8fc;
+}
+
+.user-popover-logout {
+  border-top: 1px solid #e3e9f2;
+  border-radius: 0 0 10px 10px;
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.user-popover[hidden] {
   display: none !important;
 }
 
@@ -384,24 +460,6 @@
   line-height: 1.35;
 }
 
-#open-settings-btn,
-#logout-btn {
-  width: 100%;
-  border: 1px solid #cfd8e3;
-  background: #fff;
-  color: #243044;
-  border-radius: 9px;
-  padding: 0.4rem 0.55rem;
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-#open-settings-btn:hover,
-#logout-btn:hover {
-  background: #f2f6fb;
-}
-
 .settings-modal {
   position: fixed;
   inset: 0;
@@ -417,7 +475,7 @@
 }
 
 .settings-modal-card {
-  width: min(440px, 92vw);
+  width: min(820px, 92vw);
   border-radius: 26px;
   border: 1px solid rgba(214, 224, 238, 0.96);
   background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
@@ -438,6 +496,56 @@
   font-family: "Manrope", sans-serif;
   font-size: 1.08rem;
   letter-spacing: -0.02em;
+}
+
+.settings-modal-layout {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 12px;
+  min-height: 380px;
+}
+
+.settings-nav {
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #f8fbff;
+  padding: 8px;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.settings-nav-item {
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #334155;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.settings-nav-item:hover {
+  background: #f1f5fb;
+}
+
+.settings-nav-item.active {
+  border-color: #d2dff3;
+  background: #eef4ff;
+  color: #1e3a8a;
+}
+
+.settings-panel {
+  min-width: 0;
+  display: grid;
+}
+
+.settings-pane {
+  display: grid;
+  align-content: start;
+  gap: 10px;
 }
 
 .settings-close-btn {
@@ -1224,7 +1332,8 @@
 @media (max-width: 980px) {
   .brand span,
   .brand-sub,
-  #user-name {
+  #user-name,
+  .user-meta small {
     display: none;
   }
 
@@ -1322,10 +1431,16 @@
     height: 0.62rem;
   }
 
-  #open-settings-btn,
-  #logout-btn {
-    font-size: 0.68rem;
-    padding: 0.35rem 0.3rem;
+  .user-popover {
+    left: -2px;
+    right: -2px;
+    padding: 6px;
+  }
+
+  .user-popover-list button,
+  .user-popover-logout {
+    font-size: 0.69rem;
+    padding: 6px;
   }
 
   .settings-input {
@@ -1366,10 +1481,21 @@
   }
 
   .settings-modal-card {
-    width: min(420px, 100%);
+    width: min(760px, 100%);
     max-height: 94vh;
     overflow-y: auto;
     border-radius: 22px;
+  }
+
+  .settings-modal-layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .settings-nav {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(120px, 1fr);
+    overflow-x: auto;
   }
 
   .run-btn {

@@ -32,6 +32,7 @@ const statusEl = document.getElementById("status");
 const historyListEl = document.getElementById("history-list");
 const runButton = form ? form.querySelector("button[type='submit']") : null;
 const userNameEl = document.getElementById("user-name");
+const userPopoverNameEl = document.getElementById("user-popover-name");
 const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
 const sidebarUserEl = document.querySelector(".sidebar-user");
@@ -56,6 +57,7 @@ const upgradeLinkEl = document.getElementById("upgrade-link");
 const openSettingsBtn = document.getElementById("open-settings-btn");
 const settingsModalEl = document.getElementById("settings-modal");
 const settingsCloseBtn = document.getElementById("settings-close-btn");
+const settingsNavItems = Array.from(document.querySelectorAll(".settings-nav-item"));
 const workspaceHeadingEl = document.querySelector(".workspace-title h1");
 const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
@@ -277,11 +279,27 @@ function renderWorkspaceSection() {
 function openSettingsModal() {
   if (!settingsModalEl) return;
   settingsModalEl.hidden = false;
+  switchSettingsTab("integrations");
 }
 
 function closeSettingsModal() {
   if (!settingsModalEl) return;
   settingsModalEl.hidden = true;
+}
+
+function switchSettingsTab(tabName) {
+  const next = String(tabName || "integrations").toLowerCase();
+  settingsNavItems.forEach((button) => {
+    const tab = String(button.getAttribute("data-settings-tab") || "").toLowerCase();
+    button.classList.toggle("active", tab === next);
+  });
+
+  const paneIds = ["general", "integrations", "notifications"];
+  paneIds.forEach((name) => {
+    const pane = document.getElementById(`settings-pane-${name}`);
+    if (!pane) return;
+    pane.hidden = name !== next;
+  });
 }
 
 async function loadShopifyStatus() {
@@ -657,6 +675,15 @@ if (openSettingsBtn) {
   });
 }
 
+if (settingsNavItems.length) {
+  settingsNavItems.forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.getAttribute("data-settings-tab") || "integrations";
+      switchSettingsTab(tab);
+    });
+  });
+}
+
 if (settingsCloseBtn) {
   settingsCloseBtn.addEventListener("click", closeSettingsModal);
 }
@@ -685,7 +712,9 @@ async function bootstrap() {
     const me = await fetchCurrentUser();
     if (userNameEl) {
       const fallbackName = typeof me.email === "string" ? me.email.split("@")[0] : "User";
-      userNameEl.textContent = me.full_name || fallbackName;
+      const displayName = me.full_name || fallbackName;
+      userNameEl.textContent = displayName;
+      if (userPopoverNameEl) userPopoverNameEl.textContent = displayName;
     }
 
     updateWorkspaceHeader("history");

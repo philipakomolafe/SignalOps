@@ -70,11 +70,27 @@
       <div class="sidebar-user">
         <button id="user-toggle" class="user-toggle" type="button" aria-expanded="false">
           <span class="user-avatar" aria-hidden="true"></span>
-          <span id="user-name">User</span>
+          <span class="user-meta">
+            <span id="user-name">User</span>
+            <small>Workspace account</small>
+          </span>
         </button>
-        <div id="user-actions" class="user-actions" hidden>
-          <button id="open-settings-btn" type="button">Settings</button>
-          <button id="logout-btn" type="button">Log out</button>
+        <div id="user-actions" class="user-popover" hidden>
+          <div class="user-popover-head">
+            <span class="user-avatar" aria-hidden="true"></span>
+            <div>
+              <strong id="user-popover-name">User</strong>
+              <small>SignalOps account</small>
+            </div>
+          </div>
+          <div class="user-popover-list">
+            <button type="button">Upgrade plan</button>
+            <button type="button">Personalization</button>
+            <button type="button">Profile</button>
+            <button id="open-settings-btn" type="button">Settings</button>
+            <button type="button">Help</button>
+          </div>
+          <button id="logout-btn" class="user-popover-logout" type="button">Log out</button>
         </div>
       </div>
     </aside>
@@ -119,18 +135,49 @@
         <h2 id="settings-modal-title">Settings</h2>
         <button id="settings-close-btn" class="settings-close-btn" type="button" aria-label="Close settings">Close</button>
       </header>
-      <section class="settings-stack" aria-label="Integration settings">
-        <h4>Shopify setup</h4>
-        <label class="settings-label" for="shop-domain-input">Shopify store</label>
-        <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
-        <div class="settings-actions-row">
-          <button id="shopify-connect-btn" type="button">Connect</button>
-          <button id="shopify-disconnect-btn" type="button">Disconnect</button>
-        </div>
-        <button id="shopify-sync-btn" type="button">Sync now</button>
-        <button id="weekly-report-btn" type="button">Weekly report</button>
-        <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
-      </section>
+      <div class="settings-modal-layout">
+        <nav class="settings-nav" aria-label="Settings sections">
+          <button class="settings-nav-item" id="settings-tab-general" data-settings-tab="general" type="button">General</button>
+          <button class="settings-nav-item active" id="settings-tab-integrations" data-settings-tab="integrations" type="button">Integrations</button>
+          <button class="settings-nav-item" id="settings-tab-notifications" data-settings-tab="notifications" type="button">Notifications</button>
+        </nav>
+        <section class="settings-panel">
+          <div id="settings-pane-general" class="settings-pane" hidden>
+            <div class="settings-stack">
+              <h4>General</h4>
+              <p class="settings-note">SignalOps keeps this workspace focused on operational decisions from your store data.</p>
+              <p class="settings-note">Use Integrations to connect Shopify and trigger weekly reports.</p>
+            </div>
+          </div>
+
+          <div id="settings-pane-integrations" class="settings-pane">
+            <section class="settings-stack" aria-label="Integration settings">
+              <h4>Shopify setup</h4>
+              <label class="settings-label" for="shop-domain-input">Shopify store</label>
+              <input id="shop-domain-input" class="settings-input" type="text" placeholder="your-shop.myshopify.com" />
+              <div class="settings-actions-row">
+                <button id="shopify-connect-btn" type="button">Connect</button>
+                <button id="shopify-disconnect-btn" type="button">Disconnect</button>
+              </div>
+              <button id="shopify-sync-btn" type="button">Sync now</button>
+              <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
+            </section>
+
+            <section class="settings-stack" aria-label="Report settings">
+              <h4>Weekly report</h4>
+              <p class="settings-note">Send the latest weekly SignalOps brief to your account email.</p>
+              <button id="weekly-report-btn" type="button">Send weekly report</button>
+            </section>
+          </div>
+
+          <div id="settings-pane-notifications" class="settings-pane" hidden>
+            <div class="settings-stack">
+              <h4>Notifications</h4>
+              <p class="settings-note">Notification controls will be added as monitoring channels expand.</p>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 
