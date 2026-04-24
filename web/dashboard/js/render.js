@@ -88,22 +88,13 @@ function metricMiniChart(values, tone = "neutral") {
   const min = Math.min(...safe);
   const max = Math.max(...safe);
   const span = Math.max(max - min, 0.0001);
-  const step = safe.length > 1 ? plotW / (safe.length - 1) : 0;
+  const step = safe.length === 1 ? 0 : plotW / (safe.length - 1);
 
-  let points = safe.map((value, index) => {
+  const points = safe.map((value, index) => {
     const x = padX + step * index;
     const y = padY + (max - value) / span * plotH;
     return { x, y };
   });
-
-  // Keep single-point series visually obvious by spanning the full chart width.
-  if (points.length === 1) {
-    const only = points[0];
-    points = [
-      { x: padX, y: only.y },
-      { x: padX + plotW, y: only.y },
-    ];
-  }
 
   const linePath = points
     .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
@@ -576,7 +567,7 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
 
   const retentionCard = narrativeCard(
     "Retention strength",
-    `Repeat rate is ${formatPct(summary.repeat_rate || 0)} across the last ${performance?.window_days || 7} days.`,
+    `Repeat rate is ${formatPct(summary.repeat_rate || 0)} and purchase frequency is ${Number(summary.purchase_frequency || 0).toFixed(2)}.`,
     retentionTone
   );
   retentionCard.prepend(metricMiniChart(repeatSeries, retentionTone));
