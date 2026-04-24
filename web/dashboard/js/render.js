@@ -88,13 +88,22 @@ function metricMiniChart(values, tone = "neutral") {
   const min = Math.min(...safe);
   const max = Math.max(...safe);
   const span = Math.max(max - min, 0.0001);
-  const step = safe.length === 1 ? 0 : plotW / (safe.length - 1);
+  const step = safe.length > 1 ? plotW / (safe.length - 1) : 0;
 
-  const points = safe.map((value, index) => {
+  let points = safe.map((value, index) => {
     const x = padX + step * index;
     const y = padY + (max - value) / span * plotH;
     return { x, y };
   });
+
+  // Keep single-point series visually obvious by spanning the full chart width.
+  if (points.length === 1) {
+    const only = points[0];
+    points = [
+      { x: padX, y: only.y },
+      { x: padX + plotW, y: only.y },
+    ];
+  }
 
   const linePath = points
     .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
