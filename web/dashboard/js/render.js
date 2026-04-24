@@ -58,6 +58,62 @@ function formatTrend(value, suffix = "%") {
   return `${sign}${numeric.toFixed(2)}${suffix}`;
 }
 
+function extractSeries(points, key) {
+  if (!Array.isArray(points) || !points.length) return [];
+  return points
+    .map((point) => Number(point?.[key]))
+    .filter((value) => Number.isFinite(value));
+}
+
+function metricMiniChart(values, tone = "neutral") {
+  const safe = Array.isArray(values) ? values : [];
+  const width = 252;
+  const height = 80;
+  const padX = 4;
+  const padY = 6;
+  const plotW = width - padX * 2;
+  const plotH = height - padY * 2;
+
+  if (!safe.length) {
+    return el(
+      "div",
+      "metric-mini-chart empty",
+      `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true">
+         <rect x="${padX}" y="${padY}" width="${plotW}" height="${plotH}" rx="8" />
+         <line x1="${padX + 8}" y1="${height - 24}" x2="${width - 12}" y2="${height - 24}" />
+       </svg>`
+    );
+  }
+
+  const min = Math.min(...safe);
+  const max = Math.max(...safe);
+  const span = Math.max(max - min, 0.0001);
+  const step = safe.length === 1 ? 0 : plotW / (safe.length - 1);
+
+  const points = safe.map((value, index) => {
+    const x = padX + step * index;
+    const y = padY + (max - value) / span * plotH;
+    return { x, y };
+  });
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
+    .join(" ");
+  const areaPath = `${linePath} L${(padX + plotW).toFixed(2)},${(padY + plotH).toFixed(2)} L${padX.toFixed(2)},${(padY + plotH).toFixed(2)} Z`;
+
+  const last = points[points.length - 1];
+  return el(
+    "div",
+    `metric-mini-chart tone-${tone}`,
+    `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true">
+       <rect x="${padX}" y="${padY}" width="${plotW}" height="${plotH}" rx="8" />
+       <path class="metric-mini-area" d="${areaPath}" />
+       <path class="metric-mini-line" d="${linePath}" />
+       <circle class="metric-mini-dot" cx="${last.x.toFixed(2)}" cy="${last.y.toFixed(2)}" r="2.6" />
+     </svg>`
+  );
+}
+
 function healthTone(value, { goodMin = null, badMin = null, reverse = false } = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "neutral";
@@ -469,6 +525,9 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
   const summary = performance && performance.summary ? performance.summary : {};
   const points = Array.isArray(performance && performance.points) ? performance.points : [];
   const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
+  const wowSeries = extractSeries(points, "week_over_week_revenue_change_pct");
+  const repeatSeries = extractSeries(points, "repeat_rate");
+  const refundSeries = extractSeries(points, "refund_rate");
 
   const wrapper = workspaceSection(
     "Store operating view",
@@ -492,29 +551,35 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
   wrapper.appendChild(metricsGrid);
 
   const narrativeGrid = el("div", "narrative-grid");
-  narrativeGrid.appendChild(
-    narrativeCard(
-      "Demand momentum",
-      summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
-        ? "Revenue trend is not available yet because there is not enough recent run history."
-        : `Week-over-week revenue is ${formatTrend(summary.week_over_week_revenue_change_pct)}. Treat this as the top store-level demand signal.`,
-      healthTone(summary.week_over_week_revenue_change_pct, { goodMin: 0, badMin: -10 })
-    )
+  const demandTone = healthTone(summary.week_over_week_revenue_change_pct, { goodMin: 0, badMin: -10 });
+  const retentionTone = healthTone(summary.repeat_rate, { goodMin: 20, badMin: 10 });
+  const refundTone = healthTone(summary.refund_rate, { goodMin: 4, badMin: 8, reverse: true });
+
+  const demandCard = narrativeCard(
+    "Demand momentum",
+    summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
+      ? "Revenue trend is not available yet because there is not enough recent run history."
+      : `Week-over-week revenue is ${formatTrend(summary.week_over_week_revenue_change_pct)}. Treat this as the top store-level demand signal.`,
+    demandTone
   );
-  narrativeGrid.appendChild(
-    narrativeCard(
-      "Retention strength",
-      `Repeat rate is ${formatPct(summary.repeat_rate || 0)} and purchase frequency is ${Number(summary.purchase_frequency || 0).toFixed(2)}.`,
-      healthTone(summary.repeat_rate, { goodMin: 20, badMin: 10 })
-    )
+  demandCard.prepend(metricMiniChart(wowSeries, demandTone));
+  narrativeGrid.appendChild(demandCard);
+
+  const retentionCard = narrativeCard(
+    "Retention strength",
+    `Repeat rate is ${formatPct(summary.repeat_rate || 0)} across the last ${performance?.window_days || 7} days.`,
+    retentionTone
   );
-  narrativeGrid.appendChild(
-    narrativeCard(
-      "Refund pressure",
-      `Refund rate is ${formatPct(summary.refund_rate || 0)} across the last ${performance?.window_days || 7} days.`,
-      healthTone(summary.refund_rate, { goodMin: 4, badMin: 8, reverse: true })
-    )
+  retentionCard.prepend(metricMiniChart(repeatSeries, retentionTone));
+  narrativeGrid.appendChild(retentionCard);
+
+  const refundCard = narrativeCard(
+    "Refund pressure",
+    `Refund rate is ${formatPct(summary.refund_rate || 0)} across the last ${performance?.window_days || 7} days.`,
+    refundTone
   );
+  refundCard.prepend(metricMiniChart(refundSeries, refundTone));
+  narrativeGrid.appendChild(refundCard);
   wrapper.appendChild(narrativeGrid);
 
   const monitorGrid = el("div", "monitor-grid");

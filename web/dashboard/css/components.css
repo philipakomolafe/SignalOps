@@ -789,6 +789,63 @@
   padding: 10px 11px;
 }
 
+.metric-mini-chart {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.metric-mini-chart svg {
+  width: 100%;
+  height: 58px;
+  display: block;
+}
+
+.metric-mini-chart rect {
+  fill: #f8fbff;
+  stroke: #dfe7f1;
+}
+
+.metric-mini-chart line {
+  stroke: #cad6e5;
+  stroke-width: 1;
+}
+
+.metric-mini-chart .metric-mini-area {
+  fill: rgba(59, 130, 246, 0.14);
+}
+
+.metric-mini-chart .metric-mini-line {
+  fill: none;
+  stroke: #1d4ed8;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.metric-mini-chart .metric-mini-dot {
+  fill: #1d4ed8;
+}
+
+.metric-mini-chart.tone-bad .metric-mini-area {
+  fill: rgba(220, 38, 38, 0.14);
+}
+
+.metric-mini-chart.tone-bad .metric-mini-line,
+.metric-mini-chart.tone-bad .metric-mini-dot {
+  stroke: #b91c1c;
+  fill: #b91c1c;
+}
+
+.metric-mini-chart.tone-good .metric-mini-area {
+  fill: rgba(5, 150, 105, 0.15);
+}
+
+.metric-mini-chart.tone-good .metric-mini-line,
+.metric-mini-chart.tone-good .metric-mini-dot {
+  stroke: #047857;
+  fill: #047857;
+}
+
 .narrative-card.is-good {
   background: linear-gradient(180deg, #f6fcf8 0%, #eff9f2 100%);
   border-color: #cfe7d6;
