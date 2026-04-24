@@ -58,6 +58,108 @@ function formatTrend(value, suffix = "%") {
   return `${sign}${numeric.toFixed(2)}${suffix}`;
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function estimateLeakImpactUsd(finding, features) {
+  if (!finding || !features) return 0;
+  const totalRevenue = Number(features.total_revenue || 0);
+  const refundRate = Number(features.refund_rate || 0);
+  const wow = Number(features.week_over_week_revenue_change_pct || 0);
+  const context = finding.context || {};
+
+  if (finding.id === "revenue_velocity_drop") {
+    const dropPct = Math.max(0, -wow);
+    return (dropPct / 100) * totalRevenue;
+  }
+
+  if (finding.id === "repeat_rate_decline") {
+    const deltaPct = Math.max(0, Math.abs(Number(context.repeat_rate_delta_pct || 0)));
+    const weighted = clamp(deltaPct / 100, 0, 0.6);
+    return totalRevenue * weighted * 0.35;
+  }
+
+  if (finding.id === "purchase_interval_expansion") {
+    const deltaPct = Math.max(0, Number(context.purchase_interval_delta_pct || 0));
+    const weighted = clamp(deltaPct / 100, 0, 1);
+    return totalRevenue * weighted * 0.22;
+  }
+
+  if (finding.id === "refund_rate_spike") {
+    const excessRefund = Math.max(0, refundRate - 4.0);
+    return (excessRefund / 100) * totalRevenue;
+  }
+
+  return totalRevenue * 0.06;
+}
+
+function totalEstimatedLeakImpact(findings, features) {
+  if (!Array.isArray(findings) || !features) return 0;
+  return findings.reduce((sum, finding) => sum + estimateLeakImpactUsd(finding, features), 0);
+}
+
+function leakImpactLine(finding, features) {
+  const amount = estimateLeakImpactUsd(finding, features);
+  return amount > 0
+    ? `Estimated 7-day leakage: ${formatCurrency(amount)}`
+    : "Estimated 7-day leakage: N/A";
+}
+
+function playbookForFinding(finding) {
+  const id = String(finding?.id || "");
+
+  if (id === "refund_rate_spike") {
+    return {
+      name: "Refund Compression Playbook",
+      objective: "Reduce preventable refunds fast without needing customer emails.",
+      steps: [
+        { day: "Day 0", action: "Identify top 2 SKUs by refund rate and map top refund reasons." },
+        { day: "Day 1", action: "Update PDP size/fit/shipping clarity and add expectation-setting visuals." },
+        { day: "Day 3", action: "Add checkout reassurance block: delivery ETA, return policy, product guarantees." },
+        { day: "Day 5", action: "Pause low-margin high-refund ads and push safer SKUs in onsite placements." },
+      ],
+    };
+  }
+
+  if (id === "repeat_rate_decline") {
+    return {
+      name: "No-Email Repeat Lift Playbook",
+      objective: "Increase second purchase rate using onsite and checkout levers.",
+      steps: [
+        { day: "Day 0", action: "Feature reorder bundles on homepage and product pages." },
+        { day: "Day 1", action: "Add post-purchase thank-you page offer with short expiry." },
+        { day: "Day 3", action: "Enable cart threshold incentive for returning-session shoppers." },
+        { day: "Day 6", action: "Promote a fast-repeat SKU collection in nav and homepage modules." },
+      ],
+    };
+  }
+
+  if (id === "purchase_interval_expansion") {
+    return {
+      name: "Cadence Recovery Playbook",
+      objective: "Shorten customer repurchase interval with timed merchandising actions.",
+      steps: [
+        { day: "Day 0", action: "Set a 7-day rotating 'replenish now' section for core SKUs." },
+        { day: "Day 2", action: "Launch limited-time multi-buy pricing on fast-reorder products." },
+        { day: "Day 4", action: "Move high-repeat SKUs to top search/sort defaults." },
+        { day: "Day 7", action: "Review interval trend and keep only actions with measurable lift." },
+      ],
+    };
+  }
+
+  return {
+    name: "Demand Recovery Sprint",
+    objective: "Recover top-line momentum using channel and onsite focus, no email list required.",
+    steps: [
+      { day: "Day 0", action: "Concentrate paid spend on top-converting SKUs and audiences only." },
+      { day: "Day 1", action: "Refresh hero offer and landing page for your best margin SKU set." },
+      { day: "Day 3", action: "Retarget recent site visitors with short-window urgency creative." },
+      { day: "Day 6", action: "Audit checkout drop-offs and remove top friction point." },
+    ],
+  };
+}
+
 function healthTone(value, { goodMin = null, badMin = null, reverse = false } = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "neutral";
@@ -101,7 +203,7 @@ function decisionPill(label, value, tone = "") {
   );
 }
 
-function conciseFindingCard(finding) {
+function conciseFindingCard(finding, features = null) {
   const tone = String(finding?.severity || "medium").toLowerCase();
   return el(
     "article",
@@ -111,6 +213,7 @@ function conciseFindingCard(finding) {
         <span class="severity">${finding.severity}</span>
         <h3>${finding.title}</h3>
       </div>
+      <p class="finding-impact">${leakImpactLine(finding, features)}</p>
       <div class="finding-brief-action">${finding.what_to_do || finding.what_changed || ""}</div>
     `
   );
@@ -132,7 +235,7 @@ function actionFormMarkup(buttonLabel = "Save Action") {
   `;
 }
 
-function appendTopFindingCards(container, findings) {
+function appendTopFindingCards(container, findings, features = null) {
   const sorted = [...(Array.isArray(findings) ? findings : [])].sort(
     (left, right) => severityRank(right.severity) - severityRank(left.severity)
   );
@@ -160,6 +263,7 @@ function appendTopFindingCards(container, findings) {
             <span class="severity">${finding.severity}</span>
             <h3>${finding.title}</h3>
           </div>
+          <p class="finding-impact">${leakImpactLine(finding, features)}</p>
           <p>${finding.what_changed || finding.likely_why || ""}</p>
           <div class="finding-brief-action">${finding.what_to_do || ""}</div>
         `
@@ -442,7 +546,9 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
 
     if (findings.length) {
       const conciseGrid = el("div", "narrative-grid concise-findings");
-      findings.slice(0, 3).forEach((finding) => conciseGrid.appendChild(conciseFindingCard(finding)));
+      findings
+        .slice(0, 3)
+        .forEach((finding) => conciseGrid.appendChild(conciseFindingCard(finding, analysis.features)));
       wrapper.appendChild(conciseGrid);
     }
   } else {
@@ -552,10 +658,19 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
       }</p>`
     )
   );
+  monitorGrid.appendChild(
+    el(
+      "article",
+      "monitor-card",
+      `<span class="label">Leak value at risk</span><strong>${formatCurrency(
+        totalEstimatedLeakImpact(findings, analysis?.features || summary)
+      )}</strong><p>Estimated revenue exposed over the next 7 days if no corrective action is taken.</p>`
+    )
+  );
   wrapper.appendChild(monitorGrid);
 
   if (analysis) {
-    appendTopFindingCards(wrapper, findings);
+    appendTopFindingCards(wrapper, findings, analysis.features);
   }
 
   const productPerformance = analysis?.features ? renderProductPerformance(analysis.features) : null;
@@ -577,11 +692,45 @@ export function renderActionWorkspace(feed, { performance, analysis } = {}) {
 
   const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
   const feedback = performance && performance.action_feedback ? performance.action_feedback : null;
+  const atRiskUsd = totalEstimatedLeakImpact(findings, analysis?.features || null);
+  const estimatedRecoveredUsd = !feedback
+    ? 0
+    : feedback.self_reported_outcome === "yes"
+      ? atRiskUsd * 0.3
+      : feedback.self_reported_outcome === "unsure"
+        ? atRiskUsd * 0.12
+        : 0;
+
+  const impactRow = el("div", "decision-pill-row");
+  impactRow.appendChild(decisionPill("7-day at risk", formatCurrency(atRiskUsd), atRiskUsd > 0 ? "bad" : "good"));
+  impactRow.appendChild(
+    decisionPill(
+      "Est. reclaimed",
+      formatCurrency(estimatedRecoveredUsd),
+      estimatedRecoveredUsd > 0 ? "good" : "neutral"
+    )
+  );
+  impactRow.appendChild(
+    decisionPill(
+      "Active playbooks",
+      findings.length ? String(Math.min(findings.length, 3)) : "0",
+      findings.length ? "neutral" : "good"
+    )
+  );
+  wrapper.appendChild(impactRow);
 
   if (findings.length) {
     const prioritized = [...findings].sort((left, right) => severityRank(right.severity) - severityRank(left.severity));
     const nextMoves = el("div", "action-list");
     prioritized.slice(0, 3).forEach((finding, index) => {
+      const playbook = playbookForFinding(finding);
+      const impact = leakImpactLine(finding, analysis?.features || null);
+      const stepsMarkup = playbook.steps
+        .map(
+          (step) =>
+            `<li><strong>${step.day}</strong><span>${step.action}</span></li>`
+        )
+        .join("");
       nextMoves.appendChild(
         el(
           "article",
@@ -592,8 +741,22 @@ export function renderActionWorkspace(feed, { performance, analysis } = {}) {
               <span class="severity">${finding.severity}</span>
             </div>
             <h3>${finding.title}</h3>
-            <p class="action-change">${finding.what_changed || ""}</p>
+            <p class="action-change">${impact}</p>
             <p class="action-step"><strong>Do next:</strong> ${finding.what_to_do || "Assign an owner and act this week."}</p>
+            <section class="playbook-block">
+              <header class="playbook-head">
+                <span class="playbook-label">${playbook.name}</span>
+                <button
+                  type="button"
+                  class="playbook-activate-btn"
+                  data-playbook-action="${playbook.name.replace(/"/g, "&quot;")}: ${finding.title}"
+                >
+                  Activate
+                </button>
+              </header>
+              <p class="playbook-objective">${playbook.objective}</p>
+              <ol class="playbook-steps">${stepsMarkup}</ol>
+            </section>
           `
         )
       );
