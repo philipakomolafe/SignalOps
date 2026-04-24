@@ -37,6 +37,7 @@ const userToggleBtn = document.getElementById("user-toggle");
 const userActionsEl = document.getElementById("user-actions");
 const sidebarUserEl = document.querySelector(".sidebar-user");
 const logoutBtn = document.getElementById("logout-btn");
+const upgradePlanBtn = document.getElementById("upgrade-plan-btn");
 
 const shopDomainInputEl = document.getElementById("shop-domain-input");
 const shopifyConnectBtn = document.getElementById("shopify-connect-btn");
@@ -68,6 +69,7 @@ let activeAnalysisPayload = null;
 let latestShopifyStatus = null;
 let currentSection = "history";
 let lastUploadedFileName = "";
+let currentPlanCode = "free";
 
 function runIdToConversationId(runId) {
   const numeric = Number(runId);
@@ -129,6 +131,7 @@ function syncUpgradeLinkForPlan(planCode, isAdmin) {
   if (!upgradeLinkEl || !planPillEl || !hangerEl) return;
 
   const safe = String(planCode || "free").toLowerCase();
+  currentPlanCode = safe;
   const isPaid = safe === "starter" || safe === "pro" || isAdmin;
   planPillEl.textContent = isPaid ? (formatPlanLabel(planCode, isAdmin) + " Active") : "Unlock";
 
@@ -142,6 +145,13 @@ function syncUpgradeLinkForPlan(planCode, isAdmin) {
   upgradeLinkEl.href =
     "/buy/?plan=" + encodeURIComponent(targetPlan) + "&return=" + encodeURIComponent(returnPath);
   hangerEl.hidden = false;
+}
+
+function buildUpgradeCheckoutUrl() {
+  const safe = String(currentPlanCode || "free").toLowerCase();
+  const targetPlan = safe === "free" ? "starter" : "pro";
+  const returnPath = "/dashboard/?billing=pending";
+  return "/buy/?plan=" + encodeURIComponent(targetPlan) + "&return=" + encodeURIComponent(returnPath);
 }
 
 async function loadAccountPlanAndBillingUi() {
@@ -534,6 +544,14 @@ if (logoutBtn) {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
       redirectToLogin();
     }
+  });
+}
+
+if (upgradePlanBtn) {
+  upgradePlanBtn.addEventListener("click", () => {
+    if (userActionsEl) userActionsEl.hidden = true;
+    if (userToggleBtn) userToggleBtn.setAttribute("aria-expanded", "false");
+    window.location.href = buildUpgradeCheckoutUrl();
   });
 }
 
