@@ -59,8 +59,7 @@ const openSettingsBtn = document.getElementById("open-settings-btn");
 const settingsModalEl = document.getElementById("settings-modal");
 const settingsCloseBtn = document.getElementById("settings-close-btn");
 const settingsNavItems = Array.from(document.querySelectorAll(".settings-nav-item"));
-const themeLightBtn = document.getElementById("theme-light-btn");
-const themeDarkBtn = document.getElementById("theme-dark-btn");
+const themeToggleInput = document.getElementById("theme-toggle-input");
 const workspaceHeadingEl = document.querySelector(".workspace-title h1");
 const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
@@ -82,8 +81,9 @@ function applyTheme(theme) {
   } catch (_error) {
     // Ignore storage failures.
   }
-  if (themeLightBtn) themeLightBtn.classList.toggle("active", safe === "light");
-  if (themeDarkBtn) themeDarkBtn.classList.toggle("active", safe === "dark");
+  if (themeToggleInput) {
+    themeToggleInput.checked = safe === "dark";
+  }
 }
 
 function loadThemePreference() {
@@ -731,12 +731,10 @@ if (settingsCloseBtn) {
   settingsCloseBtn.addEventListener("click", closeSettingsModal);
 }
 
-if (themeLightBtn) {
-  themeLightBtn.addEventListener("click", () => applyTheme("light"));
-}
-
-if (themeDarkBtn) {
-  themeDarkBtn.addEventListener("click", () => applyTheme("dark"));
+if (themeToggleInput) {
+  themeToggleInput.addEventListener("change", () => {
+    applyTheme(themeToggleInput.checked ? "dark" : "light");
+  });
 }
 
 if (settingsModalEl) {

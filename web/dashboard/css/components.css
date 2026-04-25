@@ -401,31 +401,60 @@
   color: #4b5563;
 }
 
-.theme-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+.theme-switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.theme-toggle-btn {
-  border: 1px solid #cfd8e3;
-  background: #fff;
-  color: #243044;
-  border-radius: 8px;
-  padding: 0.35rem 0.45rem;
+.theme-switch-text {
   font-size: 0.72rem;
   font-weight: 700;
-  cursor: pointer;
+  color: #475569;
 }
 
-.theme-toggle-btn:hover {
-  background: #f2f6fb;
+.theme-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  display: inline-block;
 }
 
-.theme-toggle-btn.active {
-  border-color: #c6d5f6;
-  background: #eef4ff;
-  color: #1d3a75;
+.theme-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.theme-switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  transition: 0.2s ease;
+}
+
+.theme-switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  top: 2px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: 0.2s ease;
+}
+
+.theme-switch input:checked + .theme-switch-slider {
+  background: #1f2f49;
+  border-color: #415a7a;
+}
+
+.theme-switch input:checked + .theme-switch-slider::before {
+  transform: translateX(20px);
 }
 
 .settings-input {
@@ -1510,7 +1539,7 @@
 :root[data-theme="dark"] .workspace-action-form input,
 :root[data-theme="dark"] .workspace-action-form select,
 :root[data-theme="dark"] .settings-close-btn,
-:root[data-theme="dark"] .theme-toggle-btn {
+:root[data-theme="dark"] .theme-switch-slider {
   background: #111827;
   border-color: #334155;
   color: #e5e7eb;
@@ -1520,7 +1549,6 @@
 :root[data-theme="dark"] .perf-home-btn:hover,
 :root[data-theme="dark"] .user-popover-list button:hover,
 :root[data-theme="dark"] .user-popover-logout:hover,
-:root[data-theme="dark"] .theme-toggle-btn:hover,
 :root[data-theme="dark"] #shopify-connect-btn:hover,
 :root[data-theme="dark"] #shopify-disconnect-btn:hover,
 :root[data-theme="dark"] #shopify-sync-btn:hover,
@@ -1551,7 +1579,6 @@
 
 :root[data-theme="dark"] .feed-message.user,
 :root[data-theme="dark"] #shopify-sync-btn,
-:root[data-theme="dark"] .theme-toggle-btn.active,
 :root[data-theme="dark"] .action-feedback-submit {
   background: #1f2f49;
   border-color: #415a7a;
@@ -1605,6 +1632,33 @@
 
 :root[data-theme="dark"] .status.error {
   color: #fca5a5;
+}
+
+:root[data-theme="dark"] .workspace-top h1,
+:root[data-theme="dark"] .workspace-top p,
+:root[data-theme="dark"] .feed-message h3,
+:root[data-theme="dark"] .feed-message p,
+:root[data-theme="dark"] .feed-message.system > p,
+:root[data-theme="dark"] .settings-modal-head h2,
+:root[data-theme="dark"] .settings-stack h4,
+:root[data-theme="dark"] .settings-label,
+:root[data-theme="dark"] .settings-nav-item,
+:root[data-theme="dark"] .settings-note,
+:root[data-theme="dark"] .disclosure-title,
+:root[data-theme="dark"] .product-section h4,
+:root[data-theme="dark"] .product-row-head strong,
+:root[data-theme="dark"] .product-row-head span,
+:root[data-theme="dark"] .product-row-meta span,
+:root[data-theme="dark"] .history-empty {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .theme-switch-text {
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .theme-switch-slider::before {
+  background: #e5e7eb;
 }
 
 @media (max-width: 980px) {

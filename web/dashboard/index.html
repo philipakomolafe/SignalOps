@@ -156,9 +156,13 @@
             <div class="settings-stack">
               <h4>General</h4>
               <label class="settings-label">Screen mode</label>
-              <div class="theme-toggle" role="group" aria-label="Screen mode">
-                <button id="theme-light-btn" class="theme-toggle-btn" type="button" data-theme-choice="light">Light</button>
-                <button id="theme-dark-btn" class="theme-toggle-btn" type="button" data-theme-choice="dark">Dark</button>
+              <div class="theme-switch-row">
+                <span class="theme-switch-text">Light</span>
+                <label class="theme-switch" for="theme-toggle-input" aria-label="Toggle dark mode">
+                  <input id="theme-toggle-input" type="checkbox" />
+                  <span class="theme-switch-slider"></span>
+                </label>
+                <span class="theme-switch-text">Dark</span>
               </div>
               <p class="settings-note">SignalOps keeps this workspace focused on operational decisions from your store data.</p>
               <p class="settings-note">Use Integrations to connect Shopify and trigger weekly reports.</p>
