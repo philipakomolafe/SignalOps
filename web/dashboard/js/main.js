@@ -60,6 +60,7 @@ const settingsModalEl = document.getElementById("settings-modal");
 const settingsCloseBtn = document.getElementById("settings-close-btn");
 const settingsNavItems = Array.from(document.querySelectorAll(".settings-nav-item"));
 const themeToggleInput = document.getElementById("theme-toggle-input");
+const themeSwitchControl = document.getElementById("theme-switch-control");
 const workspaceHeadingEl = document.querySelector(".workspace-title h1");
 const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
@@ -83,6 +84,9 @@ function applyTheme(theme) {
   }
   if (themeToggleInput) {
     themeToggleInput.checked = safe === "dark";
+  }
+  if (themeSwitchControl) {
+    themeSwitchControl.classList.toggle("is-on", safe === "dark");
   }
 }
 
@@ -732,7 +736,7 @@ if (settingsCloseBtn) {
 }
 
 if (themeToggleInput) {
-  themeToggleInput.addEventListener("change", () => {
+  themeToggleInput.addEventListener("input", () => {
     applyTheme(themeToggleInput.checked ? "dark" : "light");
   });
 }

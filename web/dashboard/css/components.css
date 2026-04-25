@@ -418,6 +418,7 @@
   width: 44px;
   height: 24px;
   display: inline-block;
+  cursor: pointer;
 }
 
 .theme-switch input {
@@ -432,7 +433,7 @@
   border-radius: 999px;
   background: #e2e8f0;
   border: 1px solid #cbd5e1;
-  transition: 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .theme-switch-slider::before {
@@ -445,7 +446,7 @@
   border-radius: 999px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  transition: 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .theme-switch input:checked + .theme-switch-slider {
@@ -454,6 +455,15 @@
 }
 
 .theme-switch input:checked + .theme-switch-slider::before {
+  transform: translateX(20px);
+}
+
+.theme-switch.is-on .theme-switch-slider {
+  background: #1f2f49;
+  border-color: #415a7a;
+}
+
+.theme-switch.is-on .theme-switch-slider::before {
   transform: translateX(20px);
 }
 
