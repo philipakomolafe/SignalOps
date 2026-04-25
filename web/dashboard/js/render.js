@@ -520,6 +520,15 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
 
   const summary = performance && performance.summary ? performance.summary : {};
   const points = Array.isArray(performance && performance.points) ? performance.points : [];
+  const fallbackPoint = analysis?.features
+    ? {
+        timestamp: analysis?.created_at || new Date().toISOString(),
+        total_revenue: Number(analysis.features.total_revenue || 0),
+        repeat_rate: Number(analysis.features.repeat_rate || 0),
+        refund_rate: Number(analysis.features.refund_rate || 0),
+      }
+    : null;
+  const plotPoints = points.length ? points : (fallbackPoint ? [fallbackPoint] : []);
   const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
 
   const wrapper = workspaceSection(
@@ -553,7 +562,7 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
     summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
       ? "Revenue trend is not available yet because there is not enough recent run history."
       : `Daily net revenue trend for the last ${performance?.window_days || 7} days. WoW is currently ${formatTrend(summary.week_over_week_revenue_change_pct)}.`,
-    points,
+    plotPoints,
     "total_revenue",
     (value) => formatCurrency(value),
     demandTone
@@ -563,7 +572,7 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
   const retentionCard = trendNarrativeCard(
     "Retention strength",
     `Repeat rate trend across the last ${performance?.window_days || 7} days. Current repeat rate: ${formatPct(summary.repeat_rate || 0)}.`,
-    points,
+    plotPoints,
     "repeat_rate",
     (value) => formatPct(value),
     retentionTone
@@ -573,7 +582,7 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
   const refundCard = trendNarrativeCard(
     "Refund pressure",
     `Refund rate trend across the last ${performance?.window_days || 7} days. Current refund rate: ${formatPct(summary.refund_rate || 0)}.`,
-    points,
+    plotPoints,
     "refund_rate",
     (value) => formatPct(value),
     refundTone
