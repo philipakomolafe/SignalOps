@@ -401,6 +401,33 @@
   color: #4b5563;
 }
 
+.theme-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.theme-toggle-btn {
+  border: 1px solid #cfd8e3;
+  background: #fff;
+  color: #243044;
+  border-radius: 8px;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  background: #f2f6fb;
+}
+
+.theme-toggle-btn.active {
+  border-color: #c6d5f6;
+  background: #eef4ff;
+  color: #1d3a75;
+}
+
 .settings-input {
   width: 100%;
   border: 1px solid #cfd8e3;
@@ -1327,6 +1354,137 @@
 .billing-note.is-pending {
   border-color: #d8dee8;
   background: #fbfcfe;
+}
+
+:root[data-theme="dark"] .sidebar-nav-item {
+  color: #d1d5db;
+}
+
+:root[data-theme="dark"] .sidebar-nav-item:hover {
+  background: #1b2432;
+}
+
+:root[data-theme="dark"] .sidebar-nav-item.active {
+  background: #1f2f49;
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .sidebar-section h3,
+:root[data-theme="dark"] .sidebar-kv-item dt,
+:root[data-theme="dark"] .sidebar-note,
+:root[data-theme="dark"] .brand-sub {
+  color: #9ca3af;
+}
+
+:root[data-theme="dark"] .sidebar-kv-item dd,
+:root[data-theme="dark"] .history-item strong,
+:root[data-theme="dark"] .metric .value,
+:root[data-theme="dark"] .workspace-heading,
+:root[data-theme="dark"] .primary-decision-title,
+:root[data-theme="dark"] .monitor-card strong {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .history-item,
+:root[data-theme="dark"] .sidebar-user,
+:root[data-theme="dark"] .user-toggle,
+:root[data-theme="dark"] .user-popover,
+:root[data-theme="dark"] .settings-stack,
+:root[data-theme="dark"] .settings-nav,
+:root[data-theme="dark"] .settings-modal-card,
+:root[data-theme="dark"] .decision-pill,
+:root[data-theme="dark"] .primary-decision-card,
+:root[data-theme="dark"] .feed-message.system,
+:root[data-theme="dark"] .metric,
+:root[data-theme="dark"] .finding,
+:root[data-theme="dark"] .diagnosis,
+:root[data-theme="dark"] .disclosure,
+:root[data-theme="dark"] .disclosure > summary,
+:root[data-theme="dark"] .narrative-card,
+:root[data-theme="dark"] .monitor-card,
+:root[data-theme="dark"] .action-card,
+:root[data-theme="dark"] .finding-brief,
+:root[data-theme="dark"] .action-workspace-panel,
+:root[data-theme="dark"] .drop-zone,
+:root[data-theme="dark"] .product-section,
+:root[data-theme="dark"] .product-row,
+:root[data-theme="dark"] .settings-input,
+:root[data-theme="dark"] .sidebar-feedback-form input,
+:root[data-theme="dark"] .sidebar-feedback-form select,
+:root[data-theme="dark"] #action-feedback-form input,
+:root[data-theme="dark"] #action-feedback-form select,
+:root[data-theme="dark"] .workspace-action-form input,
+:root[data-theme="dark"] .workspace-action-form select,
+:root[data-theme="dark"] .settings-close-btn,
+:root[data-theme="dark"] .theme-toggle-btn {
+  background: #111827;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .history-item:hover,
+:root[data-theme="dark"] .perf-home-btn:hover,
+:root[data-theme="dark"] .user-popover-list button:hover,
+:root[data-theme="dark"] .user-popover-logout:hover,
+:root[data-theme="dark"] .theme-toggle-btn:hover,
+:root[data-theme="dark"] #shopify-connect-btn:hover,
+:root[data-theme="dark"] #shopify-disconnect-btn:hover,
+:root[data-theme="dark"] #shopify-sync-btn:hover,
+:root[data-theme="dark"] #weekly-report-btn:hover {
+  background: #1b2432;
+}
+
+:root[data-theme="dark"] .history-item.active {
+  background: #1f2f49;
+  border-color: #415a7a;
+}
+
+:root[data-theme="dark"] .user-meta small,
+:root[data-theme="dark"] .history-item span,
+:root[data-theme="dark"] .settings-note,
+:root[data-theme="dark"] .workspace-subtitle,
+:root[data-theme="dark"] .workspace-eyebrow,
+:root[data-theme="dark"] .decision-pill-label,
+:root[data-theme="dark"] .metric .label,
+:root[data-theme="dark"] .diagnosis .label,
+:root[data-theme="dark"] .finding .severity,
+:root[data-theme="dark"] .narrative-kicker,
+:root[data-theme="dark"] .monitor-card .label,
+:root[data-theme="dark"] .action-priority,
+:root[data-theme="dark"] .disclosure-subtitle {
+  color: #9ca3af;
+}
+
+:root[data-theme="dark"] .feed-message.user,
+:root[data-theme="dark"] #shopify-sync-btn,
+:root[data-theme="dark"] .theme-toggle-btn.active,
+:root[data-theme="dark"] .action-feedback-submit {
+  background: #1f2f49;
+  border-color: #415a7a;
+  color: #dbeafe;
+}
+
+:root[data-theme="dark"] .workspace-banner,
+:root[data-theme="dark"] .billing-note,
+:root[data-theme="dark"] .billing-note.is-pending,
+:root[data-theme="dark"] .billing-note.is-success {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .run-btn {
+  background: #e5e7eb;
+  border-color: #e5e7eb;
+  color: #0f172a;
+}
+
+:root[data-theme="dark"] .status {
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .status.error {
+  color: #fca5a5;
 }
 
 @media (max-width: 980px) {

@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SignalOPs Dashboard</title>
   <meta name="description" content="SignalOPs dashboard for silent revenue leak analysis." />
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem("signalops_theme");
+        if (savedTheme === "dark" || savedTheme === "light") {
+          document.documentElement.setAttribute("data-theme", savedTheme);
+        }
+      } catch (_error) {}
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/logo.png" />
   <link rel="apple-touch-icon" href="/assets/logo.png" />
@@ -145,6 +155,11 @@
           <div id="settings-pane-general" class="settings-pane" hidden>
             <div class="settings-stack">
               <h4>General</h4>
+              <label class="settings-label">Screen mode</label>
+              <div class="theme-toggle" role="group" aria-label="Screen mode">
+                <button id="theme-light-btn" class="theme-toggle-btn" type="button" data-theme-choice="light">Light</button>
+                <button id="theme-dark-btn" class="theme-toggle-btn" type="button" data-theme-choice="dark">Dark</button>
+              </div>
               <p class="settings-note">SignalOps keeps this workspace focused on operational decisions from your store data.</p>
               <p class="settings-note">Use Integrations to connect Shopify and trigger weekly reports.</p>
             </div>

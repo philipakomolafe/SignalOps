@@ -59,9 +59,12 @@ const openSettingsBtn = document.getElementById("open-settings-btn");
 const settingsModalEl = document.getElementById("settings-modal");
 const settingsCloseBtn = document.getElementById("settings-close-btn");
 const settingsNavItems = Array.from(document.querySelectorAll(".settings-nav-item"));
+const themeLightBtn = document.getElementById("theme-light-btn");
+const themeDarkBtn = document.getElementById("theme-dark-btn");
 const workspaceHeadingEl = document.querySelector(".workspace-title h1");
 const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
+const THEME_STORAGE_KEY = "signalops_theme";
 let currentRunId = null;
 let latestPerformancePayload = null;
 let latestHistoryRows = [];
@@ -70,6 +73,28 @@ let latestShopifyStatus = null;
 let currentSection = "history";
 let lastUploadedFileName = "";
 let currentPlanCode = "free";
+
+function applyTheme(theme) {
+  const safe = theme === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", safe);
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, safe);
+  } catch (_error) {
+    // Ignore storage failures.
+  }
+  if (themeLightBtn) themeLightBtn.classList.toggle("active", safe === "light");
+  if (themeDarkBtn) themeDarkBtn.classList.toggle("active", safe === "dark");
+}
+
+function loadThemePreference() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(THEME_STORAGE_KEY);
+  } catch (_error) {
+    saved = null;
+  }
+  applyTheme(saved === "dark" ? "dark" : "light");
+}
 
 function runIdToConversationId(runId) {
   const numeric = Number(runId);
@@ -706,6 +731,14 @@ if (settingsCloseBtn) {
   settingsCloseBtn.addEventListener("click", closeSettingsModal);
 }
 
+if (themeLightBtn) {
+  themeLightBtn.addEventListener("click", () => applyTheme("light"));
+}
+
+if (themeDarkBtn) {
+  themeDarkBtn.addEventListener("click", () => applyTheme("dark"));
+}
+
 if (settingsModalEl) {
   settingsModalEl.addEventListener("click", (event) => {
     if (event.target === settingsModalEl) {
@@ -721,6 +754,7 @@ if (settingsModalEl) {
 }
 
 async function bootstrap() {
+  loadThemePreference();
   const token = requireAuthToken();
   if (!token) {
     return;
