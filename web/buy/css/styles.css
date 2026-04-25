@@ -22,23 +22,13 @@ body {
     radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.08), transparent 28%),
     radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.04), transparent 32%),
     var(--bg);
-  display: grid;
-  place-items: center;
+  display: block;
   padding: 24px;
 }
 
-.shell {
-  width: min(1020px, 100%);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: linear-gradient(180deg, #111111 0%, #0d0d0d 100%);
-  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
-  padding: clamp(18px, 3vw, 28px);
-  display: grid;
-  gap: 14px;
-}
-
 .topbar {
+  width: min(1100px, 100%);
+  margin: 0 auto 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -70,9 +60,11 @@ body {
 }
 
 .checkout-grid {
+  width: min(1100px, 100%);
+  margin: 0 auto;
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
-  gap: 14px;
+  gap: 22px;
   align-items: start;
 }
 
@@ -82,6 +74,7 @@ body {
   border-radius: var(--radius);
   background: var(--surface);
   padding: 15px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.35);
 }
 
 h1 {
@@ -99,10 +92,6 @@ p {
   margin-bottom: 0;
 }
 
-.lead {
-  max-width: 52ch;
-}
-
 .panel {
   margin-top: 1rem;
   width: 100%;
@@ -117,28 +106,10 @@ p {
   color: #ffffff;
 }
 
-.panel h2 {
-  margin: 0 0 0.25rem;
-  font-size: 0.92rem;
-  color: #f0f0f0;
-}
-
 .meta {
   font-size: 0.86rem;
   color: var(--muted);
   margin-top: 0.2rem;
-}
-
-.steps {
-  margin: 0.1rem 0 0;
-  padding-left: 1rem;
-  display: grid;
-  gap: 4px;
-}
-
-.steps li {
-  color: #cccccc;
-  font-size: 0.86rem;
 }
 
 .actions {

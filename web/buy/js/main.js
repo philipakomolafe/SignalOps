@@ -109,7 +109,7 @@
       summaryOptions.textContent = "Card, bank transfer, USSD";
     }
     if (summaryStatus) {
-      summaryStatus.textContent = "Flutterwave ready";
+      summaryStatus.textContent = "Ready";
     }
   }
 
@@ -407,7 +407,7 @@
     summaryAmount.textContent = plan === "pro" ? "$99 / month" : plan === "free" ? "$0 / month" : "$29 / month";
   }
   if (summaryStatus) {
-    summaryStatus.textContent = "Waiting for Flutterwave";
+    summaryStatus.textContent = "Waiting";
   }
   renderPlanFeatures();
   setOfferPaneReady(false, "Waiting for secure payment engine...");
