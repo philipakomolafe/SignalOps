@@ -9,57 +9,59 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="kicker">SignalOPs Checkout</div>
-    <a class="top-link" href="/v1/#pricing">Back to pricing</a>
-  </header>
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="kicker">SignalOPs Checkout</div>
+      <a class="top-link" href="/v1/#pricing">Back to pricing</a>
+    </header>
 
-  <main class="checkout-grid">
-    <article class="checkout-pane">
-      <h1>Secure checkout</h1>
+    <main class="checkout-grid">
+      <article class="checkout-pane">
+        <h1>Secure checkout</h1>
 
-      <section class="panel">
-        <strong id="planLabel">Selected plan: Starter ($29/mo)</strong>
-        <div class="meta" id="planMeta">Plan key: starter</div>
-      </section>
+        <section class="panel">
+          <strong id="planLabel">Selected plan: Starter ($29/mo)</strong>
+          <div class="meta" id="planMeta">Plan key: starter</div>
+        </section>
 
-      <div class="actions">
-        <button class="btn" id="checkoutBtn" type="button" aria-disabled="true">Continue to checkout</button>
-        <a class="btn ghost" id="accountBtn" href="/login/#register">Create account</a>
-      </div>
-
-      <p class="status" id="statusText">Checking payment readiness...</p>
-      <div class="activation-badge is-hidden" id="activationBadge" aria-live="polite"></div>
-    </article>
-
-    <aside id="offerPane" class="features-pane is-locked" aria-label="Plan features">
-      <div class="features-head">
-        <h2>What you are paying for</h2>
-      </div>
-      <p id="offerLockText" class="offer-lock-text">Waiting for secure payment engine...</p>
-      <dl id="paymentSummary" class="payment-summary" hidden>
-        <div>
-          <dt>Plan</dt>
-          <dd id="summaryPlan">Starter</dd>
+        <div class="actions">
+          <button class="btn" id="checkoutBtn" type="button" aria-disabled="true">Continue to checkout</button>
+          <a class="btn ghost" id="accountBtn" href="/login/#register">Create account</a>
         </div>
-        <div>
-          <dt>Price</dt>
-          <dd id="summaryAmount">$29 / month</dd>
+
+        <p class="status" id="statusText">Checking payment readiness...</p>
+        <div class="activation-badge is-hidden" id="activationBadge" aria-live="polite"></div>
+      </article>
+
+      <aside id="offerPane" class="features-pane is-locked" aria-label="Plan features">
+        <div class="features-head">
+          <h2>What you are paying for</h2>
         </div>
-        <div>
-          <dt>Payments</dt>
-          <dd id="summaryOptions">Card, bank transfer, USSD</dd>
-        </div>
-        <div>
-          <dt>Status</dt>
-          <dd id="summaryStatus">Ready</dd>
-        </div>
-      </dl>
-      <ul id="planFeatureList" class="feature-list">
-        <li>Loading plan features...</li>
-      </ul>
-    </aside>
-  </main>
+        <p id="offerLockText" class="offer-lock-text">Waiting for secure payment engine...</p>
+        <dl id="paymentSummary" class="payment-summary" hidden>
+          <div>
+            <dt>Plan</dt>
+            <dd id="summaryPlan">Starter</dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd id="summaryAmount">$29 / month</dd>
+          </div>
+          <div>
+            <dt>Payments</dt>
+            <dd id="summaryOptions">Card, bank transfer, USSD</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd id="summaryStatus">Ready</dd>
+          </div>
+        </dl>
+        <ul id="planFeatureList" class="feature-list">
+          <li>Loading plan features...</li>
+        </ul>
+      </aside>
+    </main>
+  </div>
 
   <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="js/main.js"></script>
