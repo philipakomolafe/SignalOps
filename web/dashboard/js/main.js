@@ -519,42 +519,6 @@ document.addEventListener("submit", async (event) => {
   }
 });
 
-document.addEventListener("click", (event) => {
-  const trigger = event.target instanceof Element
-    ? event.target.closest(".playbook-activate-btn")
-    : null;
-  if (!trigger) return;
-
-  const actionText = String(trigger.getAttribute("data-playbook-action") || "").trim();
-  if (!actionText) return;
-
-  const targetForm = document.querySelector("[data-action-feedback-form='true']");
-  if (!(targetForm instanceof HTMLFormElement)) {
-    setStatus("Open Action workspace to activate this playbook.", true);
-    return;
-  }
-
-  const actionInput = targetForm.querySelector("input[name='action_taken']");
-  const dateInput = targetForm.querySelector("input[name='action_date']");
-  const outcomeInput = targetForm.querySelector("select[name='self_reported_outcome']");
-
-  if (actionInput instanceof HTMLInputElement) {
-    actionInput.value = actionText;
-  }
-  if (dateInput instanceof HTMLInputElement && !dateInput.value) {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    dateInput.value = `${now.getFullYear()}-${month}-${day}`;
-  }
-  if (outcomeInput instanceof HTMLSelectElement) {
-    outcomeInput.value = "unsure";
-  }
-
-  targetForm.scrollIntoView({ behavior: "smooth", block: "center" });
-  setStatus("Playbook activated. Confirm and save this action below.");
-});
-
 if (fileInput) {
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
