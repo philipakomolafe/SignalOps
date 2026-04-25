@@ -44,14 +44,17 @@
   var checkoutBtn = document.getElementById("checkoutBtn");
   var accountBtn = document.getElementById("accountBtn");
   var activationBadge = document.getElementById("activationBadge");
+  var offerPane = document.getElementById("offerPane");
+  var offerLockText = document.getElementById("offerLockText");
+  var paymentSummary = document.getElementById("paymentSummary");
+  var summaryPlan = document.getElementById("summaryPlan");
+  var summaryAmount = document.getElementById("summaryAmount");
+  var summaryOptions = document.getElementById("summaryOptions");
+  var summaryStatus = document.getElementById("summaryStatus");
   var planFeatureList = document.getElementById("planFeatureList");
-  var planFeatureModalList = document.getElementById("planFeatureModalList");
-  var featuresModal = document.getElementById("featuresModal");
-  var featuresModalPlan = document.getElementById("featuresModalPlan");
-  var viewFeaturesBtn = document.getElementById("viewFeaturesBtn");
-  var closeFeaturesBtn = document.getElementById("closeFeaturesBtn");
   var canCheckout = false;
   var activationPollTimer = null;
+  var flutterwaveScriptReady = false;
 
   function selectedPlanKey() {
     if (plan === "pro") {
@@ -77,26 +80,62 @@
     if (planFeatureList) {
       planFeatureList.innerHTML = listMarkup(features);
     }
-    if (planFeatureModalList) {
-      planFeatureModalList.innerHTML = listMarkup(features);
-    }
-    if (featuresModalPlan) {
-      featuresModalPlan.textContent = "Plan: " + label;
+    if (summaryPlan) {
+      summaryPlan.textContent = label;
     }
   }
 
-  function openFeaturesModal() {
-    if (!featuresModal) {
+  function setOfferPaneReady(ready, lockMessage) {
+    if (!offerPane) {
       return;
     }
-    featuresModal.hidden = false;
+    offerPane.classList.toggle("is-locked", !ready);
+    offerPane.classList.toggle("is-ready", !!ready);
+    if (offerLockText) {
+      offerLockText.textContent = lockMessage || "";
+    }
+    if (paymentSummary) {
+      paymentSummary.hidden = !ready;
+    }
   }
 
-  function closeFeaturesModal() {
-    if (!featuresModal) {
-      return;
+  function setPaymentSummary(payload) {
+    if (!payload) return;
+    if (summaryAmount) {
+      var amountText = "$" + Number(payload.amount || 0).toLocaleString() + " / month";
+      summaryAmount.textContent = amountText;
     }
-    featuresModal.hidden = true;
+    if (summaryOptions) {
+      summaryOptions.textContent = "Card, bank transfer, USSD";
+    }
+    if (summaryStatus) {
+      summaryStatus.textContent = "Flutterwave ready";
+    }
+  }
+
+  function waitForFlutterwaveReady() {
+    var checks = 0;
+    var maxChecks = 25;
+    var timer = window.setInterval(function () {
+      checks += 1;
+      if (typeof window.FlutterwaveCheckout === "function") {
+        flutterwaveScriptReady = true;
+        window.clearInterval(timer);
+        setOfferPaneReady(true, "");
+        return;
+      }
+      if (checks >= maxChecks) {
+        window.clearInterval(timer);
+        flutterwaveScriptReady = false;
+        setOfferPaneReady(false, "Payment engine unavailable. Refresh and try again.");
+      }
+    }, 180);
+
+    if (typeof window.FlutterwaveCheckout === "function") {
+      flutterwaveScriptReady = true;
+      window.clearInterval(timer);
+      setOfferPaneReady(true, "");
+    }
   }
 
   function setCheckoutState(enabled, text) {
@@ -283,6 +322,9 @@
 
     setCheckoutState(false, "Preparing secure checkout...");
     setStatus("Initializing secure payment session...");
+    if (summaryStatus) {
+      summaryStatus.textContent = "Initializing";
+    }
 
     fetch("/api/v1/payments/flutterwave/initialize", {
       method: "POST",
@@ -306,6 +348,9 @@
         if (typeof window.FlutterwaveCheckout !== "function") {
           throw new Error("Flutterwave checkout script is unavailable");
         }
+        flutterwaveScriptReady = true;
+        setOfferPaneReady(true, "");
+        setPaymentSummary(payload);
 
         setCheckoutState(true, "Continue to secure checkout");
         window.FlutterwaveCheckout({
@@ -331,12 +376,18 @@
             window.location.href = nextUrl;
           },
           onclose: function () {
+            if (summaryStatus) {
+              summaryStatus.textContent = "Closed";
+            }
             setStatus("Checkout closed. You can try again anytime.");
           },
         });
       })
       .catch(function (error) {
         setCheckoutState(true, "Continue to secure checkout");
+        if (summaryStatus) {
+          summaryStatus.textContent = "Unavailable";
+        }
         if (String(error && error.message).toLowerCase().indexOf("authentication") >= 0) {
           setStatus("Your session expired. Please log in again.");
           window.location.href = loginUrlForCurrentPlan();
@@ -352,29 +403,15 @@
   if (planMeta) {
     planMeta.textContent = "Plan key: " + (labelMap[plan] ? plan : "starter");
   }
+  if (summaryAmount) {
+    summaryAmount.textContent = plan === "pro" ? "$99 / month" : plan === "free" ? "$0 / month" : "$29 / month";
+  }
+  if (summaryStatus) {
+    summaryStatus.textContent = "Waiting for Flutterwave";
+  }
   renderPlanFeatures();
-
-  if (viewFeaturesBtn) {
-    viewFeaturesBtn.addEventListener("click", openFeaturesModal);
-  }
-
-  if (closeFeaturesBtn) {
-    closeFeaturesBtn.addEventListener("click", closeFeaturesModal);
-  }
-
-  if (featuresModal) {
-    featuresModal.addEventListener("click", function (event) {
-      if (event.target === featuresModal) {
-        closeFeaturesModal();
-      }
-    });
-
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        closeFeaturesModal();
-      }
-    });
-  }
+  setOfferPaneReady(false, "Waiting for secure payment engine...");
+  waitForFlutterwaveReady();
 
   if (status === "success") {
     setStatus("Payment submitted. We are verifying your transaction now.");
@@ -411,11 +448,18 @@
 
       if (plan === "free") {
         setCheckoutState(true, "Continue with free plan");
+        setOfferPaneReady(true, "");
+        if (summaryStatus) {
+          summaryStatus.textContent = "No payment required";
+        }
         if (accountBtn) {
           accountBtn.href = "/login/#register";
         }
       } else {
         setCheckoutState(enabled, enabled ? "Continue to secure checkout" : "Checkout unavailable");
+        if (!flutterwaveScriptReady && enabled) {
+          setOfferPaneReady(false, "Waiting for secure payment engine...");
+        }
         if (accountBtn) {
           accountBtn.href = authToken ? "/dashboard/" : loginUrlForCurrentPlan();
         }

@@ -45,28 +45,35 @@
         <div class="activation-badge is-hidden" id="activationBadge" aria-live="polite"></div>
       </article>
 
-      <aside class="features-pane" aria-label="Plan features">
+      <aside id="offerPane" class="features-pane is-locked" aria-label="Plan features">
         <div class="features-head">
-          <h2>Included in this plan</h2>
-          <button id="viewFeaturesBtn" class="link-btn" type="button">View as modal</button>
+          <h2>What you are paying for</h2>
         </div>
+        <p id="offerLockText" class="offer-lock-text">Waiting for secure payment engine...</p>
+        <dl id="paymentSummary" class="payment-summary" hidden>
+          <div>
+            <dt>Plan</dt>
+            <dd id="summaryPlan">Starter</dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd id="summaryAmount">$29 / month</dd>
+          </div>
+          <div>
+            <dt>Payments</dt>
+            <dd id="summaryOptions">Card, bank transfer, USSD</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd id="summaryStatus">Ready</dd>
+          </div>
+        </dl>
         <ul id="planFeatureList" class="feature-list">
           <li>Loading plan features...</li>
         </ul>
       </aside>
     </section>
   </main>
-
-  <div id="featuresModal" class="feature-modal" hidden>
-    <div class="feature-modal-card" role="dialog" aria-modal="true" aria-labelledby="features-modal-title">
-      <header class="feature-modal-head">
-        <h3 id="features-modal-title">Plan features</h3>
-        <button id="closeFeaturesBtn" class="close-btn" type="button" aria-label="Close">Close</button>
-      </header>
-      <p id="featuresModalPlan" class="feature-modal-plan">Starter</p>
-      <ul id="planFeatureModalList" class="feature-list modal-list"></ul>
-    </div>
-  </div>
 
   <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="js/main.js"></script>
