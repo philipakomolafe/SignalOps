@@ -58,6 +58,58 @@ function formatTrend(value, suffix = "%") {
   return `${sign}${numeric.toFixed(2)}${suffix}`;
 }
 
+function formatDayLabel(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric" });
+}
+
+function verticalTrendPlot(points, key, valueFormatter) {
+  const recent = Array.isArray(points) ? points.slice(-7) : [];
+  const values = recent.map((point) => Number(point?.[key]));
+  const safe = values.filter((value) => Number.isFinite(value));
+  if (!safe.length) {
+    return el("div", "trend-plot-empty", "No recent trend data");
+  }
+
+  const min = Math.min(...safe);
+  const max = Math.max(...safe);
+  const span = Math.max(max - min, 0.0001);
+
+  const bars = el("div", "trend-bars");
+  recent.forEach((point) => {
+    const raw = Number(point?.[key]);
+    if (!Number.isFinite(raw)) {
+      bars.appendChild(el("div", "trend-bar trend-bar-empty", `<span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>`));
+      return;
+    }
+
+    const ratio = span === 0 ? 1 : (raw - min) / span;
+    const heightPct = Math.max(12, Math.round(ratio * 100));
+    const formatted = valueFormatter(raw);
+    const bar = el(
+      "div",
+      "trend-bar",
+      `
+        <div class="trend-bar-fill" style="height:${heightPct}%;" data-tip="${formatted}" title="${formatted} (${formatDayLabel(point?.timestamp)})"></div>
+        <span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>
+      `
+    );
+    bars.appendChild(bar);
+  });
+
+  return bars;
+}
+
+function trendNarrativeCard(title, description, points, key, valueFormatter, tone = "") {
+  const card = el("article", `narrative-card trend-card${tone ? ` is-${tone}` : ""}`);
+  card.appendChild(textEl("span", "narrative-kicker", title));
+  card.appendChild(verticalTrendPlot(points, key, valueFormatter));
+  card.appendChild(textEl("p", "trend-description", description));
+  return card;
+}
+
 function healthTone(value, { goodMin = null, badMin = null, reverse = false } = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return "neutral";
@@ -496,25 +548,34 @@ export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatu
   const retentionTone = healthTone(summary.repeat_rate, { goodMin: 20, badMin: 10 });
   const refundTone = healthTone(summary.refund_rate, { goodMin: 4, badMin: 8, reverse: true });
 
-  const demandCard = narrativeCard(
+  const demandCard = trendNarrativeCard(
     "Demand momentum",
     summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
       ? "Revenue trend is not available yet because there is not enough recent run history."
-      : `Week-over-week revenue is ${formatTrend(summary.week_over_week_revenue_change_pct)}. Treat this as the top store-level demand signal.`,
+      : `Daily net revenue trend for the last ${performance?.window_days || 7} days. WoW is currently ${formatTrend(summary.week_over_week_revenue_change_pct)}.`,
+    points,
+    "total_revenue",
+    (value) => formatCurrency(value),
     demandTone
   );
   narrativeGrid.appendChild(demandCard);
 
-  const retentionCard = narrativeCard(
+  const retentionCard = trendNarrativeCard(
     "Retention strength",
-    `Repeat rate is ${formatPct(summary.repeat_rate || 0)} and purchase frequency is ${Number(summary.purchase_frequency || 0).toFixed(2)}.`,
+    `Repeat rate trend across the last ${performance?.window_days || 7} days. Current repeat rate: ${formatPct(summary.repeat_rate || 0)}.`,
+    points,
+    "repeat_rate",
+    (value) => formatPct(value),
     retentionTone
   );
   narrativeGrid.appendChild(retentionCard);
 
-  const refundCard = narrativeCard(
+  const refundCard = trendNarrativeCard(
     "Refund pressure",
-    `Refund rate is ${formatPct(summary.refund_rate || 0)} across the last ${performance?.window_days || 7} days.`,
+    `Refund rate trend across the last ${performance?.window_days || 7} days. Current refund rate: ${formatPct(summary.refund_rate || 0)}.`,
+    points,
+    "refund_rate",
+    (value) => formatPct(value),
     refundTone
   );
   narrativeGrid.appendChild(refundCard);
