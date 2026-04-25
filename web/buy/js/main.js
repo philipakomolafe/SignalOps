@@ -13,6 +13,30 @@
     starter: "Starter ($29/mo)",
     pro: "Pro ($99/mo)",
   };
+  var planFeaturesMap = {
+    free: [
+      "Single CSV analysis to test SignalOps quickly",
+      "Core leak detection summary",
+      "Runs history for your account",
+      "Basic workspace access",
+    ],
+    starter: [
+      "Unlimited CSV analyses",
+      "Store, Runs, and Action workspaces",
+      "Leak findings with operational diagnosis",
+      "Weekly report email delivery",
+      "Shopify integration setup",
+      "Priority product updates",
+    ],
+    pro: [
+      "Everything in Starter",
+      "Shopify monitor-now automation",
+      "Autonomous monitor endpoint for schedules",
+      "Advanced monitoring + higher usage limits",
+      "Team-ready operating workflow for retention/refund leaks",
+      "Priority support and faster issue handling",
+    ],
+  };
 
   var planLabel = document.getElementById("planLabel");
   var planMeta = document.getElementById("planMeta");
@@ -20,8 +44,60 @@
   var checkoutBtn = document.getElementById("checkoutBtn");
   var accountBtn = document.getElementById("accountBtn");
   var activationBadge = document.getElementById("activationBadge");
+  var planFeatureList = document.getElementById("planFeatureList");
+  var planFeatureModalList = document.getElementById("planFeatureModalList");
+  var featuresModal = document.getElementById("featuresModal");
+  var featuresModalPlan = document.getElementById("featuresModalPlan");
+  var viewFeaturesBtn = document.getElementById("viewFeaturesBtn");
+  var closeFeaturesBtn = document.getElementById("closeFeaturesBtn");
   var canCheckout = false;
   var activationPollTimer = null;
+
+  function selectedPlanKey() {
+    if (plan === "pro") {
+      return "pro";
+    }
+    if (plan === "free") {
+      return "free";
+    }
+    return "starter";
+  }
+
+  function renderPlanFeatures() {
+    var key = selectedPlanKey();
+    var features = planFeaturesMap[key] || planFeaturesMap.starter;
+    var label = labelMap[key] || labelMap.starter;
+
+    function listMarkup(items) {
+      return items.map(function (item) {
+        return "<li>" + item + "</li>";
+      }).join("");
+    }
+
+    if (planFeatureList) {
+      planFeatureList.innerHTML = listMarkup(features);
+    }
+    if (planFeatureModalList) {
+      planFeatureModalList.innerHTML = listMarkup(features);
+    }
+    if (featuresModalPlan) {
+      featuresModalPlan.textContent = "Plan: " + label;
+    }
+  }
+
+  function openFeaturesModal() {
+    if (!featuresModal) {
+      return;
+    }
+    featuresModal.hidden = false;
+  }
+
+  function closeFeaturesModal() {
+    if (!featuresModal) {
+      return;
+    }
+    featuresModal.hidden = true;
+  }
 
   function setCheckoutState(enabled, text) {
     if (!checkoutBtn) {
@@ -275,6 +351,29 @@
   }
   if (planMeta) {
     planMeta.textContent = "Plan key: " + (labelMap[plan] ? plan : "starter");
+  }
+  renderPlanFeatures();
+
+  if (viewFeaturesBtn) {
+    viewFeaturesBtn.addEventListener("click", openFeaturesModal);
+  }
+
+  if (closeFeaturesBtn) {
+    closeFeaturesBtn.addEventListener("click", closeFeaturesModal);
+  }
+
+  if (featuresModal) {
+    featuresModal.addEventListener("click", function (event) {
+      if (event.target === featuresModal) {
+        closeFeaturesModal();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeFeaturesModal();
+      }
+    });
   }
 
   if (status === "success") {
