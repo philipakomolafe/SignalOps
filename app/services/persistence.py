@@ -3,6 +3,7 @@ import json
 from collections import Counter
 # SQLite runtime + DB operations.
 import sqlite3
+import time
 # Path handling for local DB file location.
 from pathlib import Path
 from datetime import datetime, timezone
@@ -381,6 +382,26 @@ def init_storage() -> None:
                 ON password_reset_tokens (token_hash)
                 """,
             )
+            _execute(
+                connection,
+                """
+                CREATE TABLE IF NOT EXISTS rate_limit_windows (
+                    user_id BIGINT NOT NULL,
+                    scope TEXT NOT NULL,
+                    window_start BIGINT NOT NULL,
+                    request_count INTEGER NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, scope, window_start)
+                )
+                """,
+            )
+            _execute(
+                connection,
+                """
+                CREATE INDEX IF NOT EXISTS idx_rate_limit_windows_scope_window
+                ON rate_limit_windows (scope, window_start DESC)
+                """,
+            )
             connection.commit()
             return
 
@@ -625,6 +646,26 @@ def init_storage() -> None:
             """
             CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token
             ON password_reset_tokens (token_hash)
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE TABLE IF NOT EXISTS rate_limit_windows (
+                user_id INTEGER NOT NULL,
+                scope TEXT NOT NULL,
+                window_start INTEGER NOT NULL,
+                request_count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, scope, window_start)
+            )
+            """,
+        )
+        _execute(
+            connection,
+            """
+            CREATE INDEX IF NOT EXISTS idx_rate_limit_windows_scope_window
+            ON rate_limit_windows (scope, window_start DESC)
             """,
         )
         connection.commit()
@@ -1765,6 +1806,75 @@ def get_latest_action_feedback(user_id: int) -> Optional[Dict[str, Any]]:
         "action_date": str(row["action_date"]),
         "self_reported_outcome": str(row["self_reported_outcome"]),
         "created_at": str(row["created_at"]),
+    }
+
+
+def consume_rate_limit_token(
+    user_id: int,
+    scope: str,
+    limit: int,
+    window_seconds: int = 3600,
+) -> Dict[str, Any]:
+    """Consume one request token for a user/scope window and return limit status."""
+    safe_limit = max(1, int(limit))
+    safe_window = max(60, int(window_seconds))
+    now_epoch = int(time.time())
+    window_start = now_epoch - (now_epoch % safe_window)
+    safe_scope = str(scope or "").strip() or "global"
+
+    with _connect() as connection:
+        if _is_postgres():
+            row = _execute(
+                connection,
+                """
+                INSERT INTO rate_limit_windows (user_id, scope, window_start, request_count, updated_at)
+                VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, scope, window_start)
+                DO UPDATE SET
+                    request_count = rate_limit_windows.request_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING request_count
+                """,
+                (int(user_id), safe_scope, int(window_start)),
+            ).fetchone()
+            request_count = int(row["request_count"] or 0) if row else 0
+            connection.commit()
+        else:
+            _execute(
+                connection,
+                """
+                INSERT INTO rate_limit_windows (user_id, scope, window_start, request_count, updated_at)
+                VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, scope, window_start)
+                DO UPDATE SET
+                    request_count = request_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (int(user_id), safe_scope, int(window_start)),
+            )
+            row = _execute(
+                connection,
+                """
+                SELECT request_count
+                FROM rate_limit_windows
+                WHERE user_id = ? AND scope = ? AND window_start = ?
+                LIMIT 1
+                """,
+                (int(user_id), safe_scope, int(window_start)),
+            ).fetchone()
+            request_count = int(row["request_count"] or 0) if row else 0
+            connection.commit()
+
+    allowed = request_count <= safe_limit
+    remaining = max(0, safe_limit - min(request_count, safe_limit))
+    reset_seconds = max(1, (window_start + safe_window) - now_epoch)
+    return {
+        "allowed": allowed,
+        "limit": safe_limit,
+        "used": request_count,
+        "remaining": remaining,
+        "reset_seconds": reset_seconds,
+        "window_seconds": safe_window,
     }
 
 

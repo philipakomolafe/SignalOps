@@ -64,6 +64,7 @@ from app.services.auth_utils import (
 )
 # Persistence layer for users, sessions, analysis history, and caching.
 from app.services.persistence import (
+    consume_rate_limit_token,
     DuplicateEmailError,
     create_signup,
     create_session,
@@ -272,6 +273,43 @@ def _require_plan(current_user: dict, allowed: set[str], denied_detail: str) -> 
     if plan not in allowed:
         raise HTTPException(status_code=403, detail=denied_detail)
     return plan
+
+
+def _analyze_hourly_limit_for_plan(plan: str) -> int:
+    """Return friendly per-hour analyze limit for each plan tier."""
+    safe = str(plan or "free").strip().lower()
+    if safe == "starter":
+        return 60
+    if safe == "pro":
+        return 180
+    if safe == "admin":
+        return 600
+    return 12
+
+
+def _enforce_analyze_rate_limit(current_user: dict, plan: str) -> None:
+    """Apply per-user per-hour request limits for heavy CSV analyze endpoint."""
+    usage = consume_rate_limit_token(
+        user_id=int(current_user["user_id"]),
+        scope="srl_analyze",
+        limit=_analyze_hourly_limit_for_plan(plan),
+        window_seconds=3600,
+    )
+    if usage["allowed"]:
+        return
+
+    retry_after = int(usage.get("reset_seconds") or 60)
+    retry_min = max(1, (retry_after + 59) // 60)
+    used = int(usage.get("used") or 0)
+    limit = int(usage.get("limit") or 0)
+    raise HTTPException(
+        status_code=429,
+        detail=(
+            f"Too many analysis requests this hour ({used}/{limit}). "
+            f"Please retry in about {retry_min} minute{'s' if retry_min != 1 else ''}."
+        ),
+        headers={"Retry-After": str(retry_after)},
+    )
 
 
 def get_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
@@ -1195,6 +1233,7 @@ async def analyze_csv(
 ) -> AnalysisResponse:
     """Analyze uploaded CSV, detect leaks, and persist result."""
     plan = _resolve_user_plan(current_user)
+    _enforce_analyze_rate_limit(current_user, plan)
     if plan == "free":
         existing_runs = list_analyses(user_id=current_user["user_id"], limit=2)
         if len(existing_runs) >= 1:
