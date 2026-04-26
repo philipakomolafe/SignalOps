@@ -276,19 +276,22 @@ def _require_plan(current_user: dict, allowed: set[str], denied_detail: str) -> 
 
 
 def _analyze_hourly_limit_for_plan(plan: str) -> int:
-    """Return friendly per-hour analyze limit for each plan tier."""
+    """Return friendly per-hour analyze limit for each plan."""
+    
+    # Safely verify the user plan provided
     safe = str(plan or "free").strip().lower()
     if safe == "starter":
-        return 60
+        return 60  # Starter plan gets 60 analyze requests per hour
     if safe == "pro":
-        return 180
+        return 180  # Pro plan gets 180 analyze request per hour.
     if safe == "admin":
-        return 600
-    return 12
+        return 600 # Admin users get a generous 600 analyze requests per hour for testing and debugging.
+    return 12 # Free users get 12 analyze requests per hour too.
 
 
 def _enforce_analyze_rate_limit(current_user: dict, plan: str) -> None:
     """Apply per-user per-hour request limits for heavy CSV analyze endpoint."""
+
     usage = consume_rate_limit_token(
         user_id=int(current_user["user_id"]),
         scope="srl_analyze",
