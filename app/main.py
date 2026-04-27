@@ -291,7 +291,6 @@ def _analyze_hourly_limit_for_plan(plan: str) -> int:
 
 def _enforce_analyze_rate_limit(current_user: dict, plan: str) -> None:
     """Apply per-user per-hour request limits for heavy CSV analyze endpoint."""
-
     usage = consume_rate_limit_token(
         user_id=int(current_user["user_id"]),
         scope="srl_analyze",

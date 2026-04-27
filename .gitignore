@@ -38,3 +38,7 @@ Thumbs.db
 /*.JPG
 /*.jpg
 /*.jpeg
+
+# Local growth experiments (do not commit)
+/docs/marketing/
+/app/utils/simulated_refund_spike_orders.csv
