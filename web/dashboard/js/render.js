@@ -16,8 +16,20 @@ function metric(label, value) {
   return el("article", "metric", `<span class="label">${label}</span><span class="value">${value}</span>`);
 }
 
-function diagnosis(label, body) {
-  return el("article", "diagnosis", `<span class="label">${label}</span><p>${body}</p>`);
+function decisionPill(label, value, tone = "") {
+  return el(
+    "article",
+    `decision-pill${tone ? ` is-${tone}` : ""}`,
+    `<span class="decision-pill-label">${label}</span><strong>${value}</strong>`
+  );
+}
+
+function workspaceSection(title, subtitle) {
+  const wrapper = el("article", "workspace-panel");
+  wrapper.appendChild(textEl("p", "workspace-eyebrow", "Decision view"));
+  wrapper.appendChild(textEl("h2", "workspace-heading", title));
+  if (subtitle) wrapper.appendChild(textEl("p", "workspace-subtitle", subtitle));
+  return wrapper;
 }
 
 function formatCurrency(value) {
@@ -28,17 +40,18 @@ function formatPct(value) {
   return `${Number(value || 0).toFixed(2)}%`;
 }
 
+function formatTrend(value, suffix = "%") {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "N/A";
+  const numeric = Number(value);
+  const sign = numeric > 0 ? "+" : "";
+  return `${sign}${numeric.toFixed(2)}${suffix}`;
+}
+
 function formatShortDate(value) {
   if (!value) return "Unknown";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function severityRank(severity) {
@@ -47,125 +60,6 @@ function severityRank(severity) {
   if (safe === "high") return 2;
   if (safe === "medium") return 1;
   return 0;
-}
-
-function formatTrend(value, suffix = "%") {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return "N/A";
-  }
-  const numeric = Number(value);
-  const sign = numeric > 0 ? "+" : "";
-  return `${sign}${numeric.toFixed(2)}${suffix}`;
-}
-
-function formatDayLabel(value) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleString(undefined, { month: "short", day: "numeric" });
-}
-
-function verticalTrendPlot(points, key, valueFormatter) {
-  const recent = Array.isArray(points) ? points.slice(-7) : [];
-  const values = recent.map((point) => Number(point?.[key]));
-  const safe = values.filter((value) => Number.isFinite(value));
-  if (!safe.length) {
-    return el("div", "trend-plot-empty", "No recent trend data");
-  }
-
-  const min = Math.min(...safe);
-  const max = Math.max(...safe);
-  const span = Math.max(max - min, 0.0001);
-
-  const bars = el("div", "trend-bars");
-  recent.forEach((point) => {
-    const raw = Number(point?.[key]);
-    if (!Number.isFinite(raw)) {
-      bars.appendChild(el("div", "trend-bar trend-bar-empty", `<span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>`));
-      return;
-    }
-
-    const ratio = span === 0 ? 1 : (raw - min) / span;
-    const heightPct = Math.max(12, Math.round(ratio * 100));
-    const formatted = valueFormatter(raw);
-    const bar = el(
-      "div",
-      "trend-bar",
-      `
-        <div class="trend-bar-fill" style="height:${heightPct}%;" data-tip="${formatted}" title="${formatted} (${formatDayLabel(point?.timestamp)})"></div>
-        <span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>
-      `
-    );
-    bars.appendChild(bar);
-  });
-
-  return bars;
-}
-
-function trendNarrativeCard(title, description, points, key, valueFormatter, tone = "") {
-  const card = el("article", `narrative-card trend-card${tone ? ` is-${tone}` : ""}`);
-  card.appendChild(textEl("span", "narrative-kicker", title));
-  card.appendChild(verticalTrendPlot(points, key, valueFormatter));
-  card.appendChild(textEl("p", "trend-description", description));
-  return card;
-}
-
-function healthTone(value, { goodMin = null, badMin = null, reverse = false } = {}) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return "neutral";
-  }
-
-  const numeric = Number(value);
-  if (reverse) {
-    if (goodMin !== null && numeric <= goodMin) return "good";
-    if (badMin !== null && numeric >= badMin) return "bad";
-    return "neutral";
-  }
-
-  if (goodMin !== null && numeric >= goodMin) return "good";
-  if (badMin !== null && numeric <= badMin) return "bad";
-  return "neutral";
-}
-
-function workspaceSection(title, subtitle) {
-  const wrapper = el("article", "workspace-panel");
-  wrapper.appendChild(textEl("p", "workspace-eyebrow", "Decision view"));
-  wrapper.appendChild(textEl("h2", "workspace-heading", title));
-  if (subtitle) {
-    wrapper.appendChild(textEl("p", "workspace-subtitle", subtitle));
-  }
-  return wrapper;
-}
-
-function narrativeCard(title, body, tone = "") {
-  return el(
-    "article",
-    `narrative-card${tone ? ` is-${tone}` : ""}`,
-    `<span class="narrative-kicker">${title}</span><p>${body}</p>`
-  );
-}
-
-function decisionPill(label, value, tone = "") {
-  return el(
-    "article",
-    `decision-pill${tone ? ` is-${tone}` : ""}`,
-    `<span class="decision-pill-label">${label}</span><strong>${value}</strong>`
-  );
-}
-
-function conciseFindingCard(finding) {
-  const tone = String(finding?.severity || "medium").toLowerCase();
-  return el(
-    "article",
-    `finding-brief compact severity-${tone}`,
-    `
-      <div class="finding-brief-head">
-        <span class="severity">${finding.severity}</span>
-        <h3>${finding.title}</h3>
-      </div>
-      <div class="finding-brief-action">${finding.what_to_do || finding.what_changed || ""}</div>
-    `
-  );
 }
 
 function actionFormMarkup(buttonLabel = "Save Action") {
@@ -184,225 +78,60 @@ function actionFormMarkup(buttonLabel = "Save Action") {
   `;
 }
 
-function appendTopFindingCards(container, findings) {
-  const sorted = [...(Array.isArray(findings) ? findings : [])].sort(
-    (left, right) => severityRank(right.severity) - severityRank(left.severity)
-  );
+function formatDayLabel(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric" });
+}
 
-  const cards = el("div", "narrative-grid");
-  if (!sorted.length) {
-    cards.appendChild(
-      narrativeCard(
-        "Stable",
-        "No critical leak triggered in the latest run. Keep watching repeat rate, refund rate, and revenue momentum weekly.",
-        "good"
-      )
-    );
-    container.appendChild(cards);
-    return;
-  }
+function verticalTrendPlot(points, key, formatter) {
+  const recent = Array.isArray(points) ? points.slice(-7) : [];
+  const values = recent.map((point) => Number(point?.[key])).filter((value) => Number.isFinite(value));
+  if (!values.length) return el("div", "trend-plot-empty", "No recent trend data");
 
-  sorted.slice(0, 3).forEach((finding) => {
-    cards.appendChild(
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 0.0001);
+
+  const bars = el("div", "trend-bars");
+  recent.forEach((point) => {
+    const raw = Number(point?.[key]);
+    if (!Number.isFinite(raw)) {
+      bars.appendChild(el("div", "trend-bar trend-bar-empty", `<span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>`));
+      return;
+    }
+    const ratio = span === 0 ? 1 : (raw - min) / span;
+    const heightPct = Math.max(12, Math.round(ratio * 100));
+    const formatted = formatter(raw);
+    bars.appendChild(
       el(
-        "article",
-        `finding-brief severity-${String(finding.severity || "medium").toLowerCase()}`,
-        `
-          <div class="finding-brief-head">
-            <span class="severity">${finding.severity}</span>
-            <h3>${finding.title}</h3>
-          </div>
-          <p>${finding.what_changed || finding.likely_why || ""}</p>
-          <div class="finding-brief-action">${finding.what_to_do || ""}</div>
-        `
+        "div",
+        "trend-bar",
+        `<div class="trend-bar-fill" style="height:${heightPct}%;" title="${formatted} (${formatDayLabel(point?.timestamp)})"></div><span class="trend-bar-day">${formatDayLabel(point?.timestamp)}</span>`
       )
     );
   });
-
-  container.appendChild(cards);
+  return bars;
 }
 
-function productRow(item, emphasisLabel, emphasisValue) {
-  const label = item.title || item.sku || item.product_id || item.variant_id || "Untitled product";
-  return el(
-    "article",
-    "product-row",
-    `
-      <div class="product-row-head">
-        <strong>${label}</strong>
-        <span>${emphasisLabel}: ${emphasisValue}</span>
-      </div>
-      <div class="product-row-meta">
-        <span>Units ${Number(item.units_sold || 0).toLocaleString()}</span>
-        <span>Orders ${Number(item.order_count || 0).toLocaleString()}</span>
-        <span>Refunds ${formatCurrency(item.refund_amount || 0)}</span>
-      </div>
-    `
-  );
-}
-
-function renderProductPerformance(features) {
-  const productPerformance = features.product_performance || {};
-  const topRevenue = Array.isArray(productPerformance.top_products_by_revenue)
-    ? productPerformance.top_products_by_revenue
-    : [];
-  const topRefund = Array.isArray(productPerformance.top_products_by_refund_rate)
-    ? productPerformance.top_products_by_refund_rate
-    : [];
-
-  if (!productPerformance.products_analyzed && topRevenue.length === 0 && topRefund.length === 0) {
-    return null;
-  }
-
-  const disclosureEl = disclosure(
-    "Product performance",
-    `${Number(productPerformance.products_analyzed || 0).toLocaleString()} products analyzed`
-  );
-
-  const overview = el("div", "product-overview");
-  overview.appendChild(metric("Products", Number(productPerformance.products_analyzed || 0).toLocaleString()));
-  overview.appendChild(metric("Units Sold", Number(productPerformance.units_sold || 0).toLocaleString()));
-  disclosureEl.appendChild(overview);
-
-  const sections = el("div", "product-sections");
-
-  if (topRevenue.length) {
-    const revenueSection = el("section", "product-section");
-    revenueSection.appendChild(el("h4", "", "Top by revenue"));
-    const revenueList = el("div", "product-list");
-    topRevenue.forEach((item) => {
-      revenueList.appendChild(productRow(item, "Net", formatCurrency(item.net_revenue || 0)));
-    });
-    revenueSection.appendChild(revenueList);
-    sections.appendChild(revenueSection);
-  }
-
-  if (topRefund.length) {
-    const refundSection = el("section", "product-section");
-    refundSection.appendChild(el("h4", "", "Top by refund rate"));
-    const refundList = el("div", "product-list");
-    topRefund.forEach((item) => {
-      refundList.appendChild(productRow(item, "Refund rate", formatPct(item.refund_rate || 0)));
-    });
-    refundSection.appendChild(refundList);
-    sections.appendChild(refundSection);
-  }
-
-  disclosureEl.appendChild(sections);
-  return disclosureEl;
-}
-
-function disclosure(title, subtitle = "") {
-  const details = el("details", "disclosure");
-  const summary = el("summary", "");
-  summary.appendChild(el("span", "disclosure-title", title));
-  if (subtitle) {
-    summary.appendChild(el("span", "disclosure-subtitle", subtitle));
-  }
-  details.appendChild(summary);
-  return details;
+function trendCard(title, description, points, key, formatter) {
+  const card = el("article", "narrative-card trend-card");
+  card.appendChild(textEl("span", "narrative-kicker", title));
+  card.appendChild(verticalTrendPlot(points, key, formatter));
+  card.appendChild(textEl("p", "trend-description", description));
+  return card;
 }
 
 export function renderUploadEvent(feed, fileName) {
-  const msg = el("article", "feed-message user", `<p>Uploaded <strong>${fileName}</strong>. Run SignalOPs diagnosis.</p>`);
-  feed.appendChild(msg);
+  feed.appendChild(el("article", "feed-message user", `<p>Uploaded <strong>${fileName}</strong>. Run SignalOPs diagnosis.</p>`));
 }
 
 export function renderAnalysis(feed, payload) {
-  return renderAnalysisCard(feed, payload, { compact: false });
-}
-
-function renderAnalysisCard(feed, payload, { compact = false } = {}) {
+  if (!feed || !payload) return;
   const wrapper = el("article", "feed-message system");
-  const features = payload.features || {};
-  const findings = Array.isArray(payload.findings) ? payload.findings : [];
-
-  wrapper.appendChild(el("h3", "", compact ? "Run details" : "SignalOPs Analysis"));
-  if (!compact) {
-    wrapper.appendChild(el("p", "", payload.summary || ""));
-  }
-  if (payload.run_id || payload.created_at || payload.source_file) {
-    const metaText = [
-      payload.run_id ? `Run #${payload.run_id}` : null,
-      payload.created_at ? payload.created_at : null,
-      payload.source_file ? payload.source_file : null,
-    ].filter(Boolean).join(" | ");
-    wrapper.appendChild(el("p", "", metaText));
-  }
-
-  const metricsGrid = el("div", "metrics-grid");
-  metricsGrid.appendChild(metric("Total Revenue", formatCurrency(features.total_revenue || 0)));
-  metricsGrid.appendChild(metric("Repeat Rate", formatPct(features.repeat_rate || 0)));
-  metricsGrid.appendChild(metric("Refund Rate", formatPct(features.refund_rate || 0)));
-  metricsGrid.appendChild(metric(
-    "WoW Revenue",
-    features.week_over_week_revenue_change_pct === null || features.week_over_week_revenue_change_pct === undefined
-      ? "N/A"
-      : formatPct(features.week_over_week_revenue_change_pct)
-  ));
-  if (!compact) {
-    metricsGrid.appendChild(metric("Revenue/User", formatCurrency(features.revenue_per_user || 0)));
-    metricsGrid.appendChild(metric("Purchase Frequency", Number(features.purchase_frequency || 0).toFixed(2)));
-  }
-  wrapper.appendChild(metricsGrid);
-
-  if (!compact) {
-    const diagnosisGrid = el("div", "diagnosis-grid");
-    diagnosisGrid.appendChild(diagnosis("What Changed", payload.diagnosis?.what_changed || "N/A"));
-    diagnosisGrid.appendChild(diagnosis("Likely Why", payload.diagnosis?.likely_why || "N/A"));
-    diagnosisGrid.appendChild(diagnosis("What To Do", payload.diagnosis?.what_to_do || "N/A"));
-    diagnosisGrid.appendChild(diagnosis("What To Watch Next", payload.diagnosis?.what_to_watch_next || "N/A"));
-    const diagnosisDisclosure = disclosure("Detailed diagnosis", "Expand for full narrative");
-    diagnosisDisclosure.appendChild(diagnosisGrid);
-    wrapper.appendChild(diagnosisDisclosure);
-  } else {
-    const compactSummary = el("div", "compact-run-summary");
-    compactSummary.appendChild(
-      decisionPill(
-        "Primary call",
-        findings.length ? String(findings[0].title || "Leak detected") : "Stable",
-        findings.length ? "bad" : "good"
-      )
-    );
-    compactSummary.appendChild(
-      decisionPill(
-        "Do next",
-        findings.length
-          ? String(findings[0].what_to_do || "Act on the primary leak")
-          : "Keep monitoring",
-        "neutral"
-      )
-    );
-    wrapper.appendChild(compactSummary);
-  }
-
-  const productPerformance = renderProductPerformance(features);
-  if (productPerformance) {
-    wrapper.appendChild(productPerformance);
-  }
-
-  const findingsGrid = el("div", "findings-grid");
-  if (findings.length === 0) {
-    findingsGrid.appendChild(el("article", "finding", `<span class="severity">Stable</span><p>No critical leaks detected by current rules.</p>`));
-  } else {
-    findings.forEach((finding) => {
-      findingsGrid.appendChild(
-        el(
-          "article",
-          "finding",
-          `<span class="severity">${finding.severity}</span><h4>${finding.title}</h4><p>${finding.what_changed}</p>`
-        )
-      );
-    });
-  }
-
-  const findingsDisclosure = disclosure(
-    compact ? "Leak details" : "Leak findings",
-    findings.length ? `${findings.length} item${findings.length === 1 ? "" : "s"}` : "No critical leaks"
-  );
-  findingsDisclosure.appendChild(findingsGrid);
-  wrapper.appendChild(findingsDisclosure);
-
+  wrapper.appendChild(el("h3", "", "SignalOPs Analysis"));
+  wrapper.appendChild(el("p", "", payload.summary || ""));
   feed.appendChild(wrapper);
 }
 
@@ -411,227 +140,123 @@ export function renderRunsWorkspace(feed, { analysis, historyRows = [], uploaded
   feed.innerHTML = "";
 
   if (!analysis && (!Array.isArray(historyRows) || historyRows.length === 0)) {
-    feed.appendChild(
-      el(
-        "article",
-        "feed-empty",
-        "<h2>No runs yet</h2><p>Upload a Shopify orders CSV or connect a store to generate your first leak brief.</p>"
-      )
-    );
+    feed.appendChild(el("article", "feed-empty", "<h2>No runs yet</h2><p>Upload CSV or sync store to generate your first analysis.</p>"));
     return;
   }
 
   const wrapper = workspaceSection(
-    "Latest leak brief",
-    "Direct signals for what needs attention now."
+    "What happened during each analysis?",
+    "Run outcome, top leak, and immediate next move."
   );
 
   if (uploadedFileName) {
-    wrapper.appendChild(
-      el(
-        "div",
-        "workspace-banner",
-        `<strong>Fresh input:</strong> ${uploadedFileName} was just analyzed.`
-      )
-    );
+    wrapper.appendChild(el("div", "workspace-banner", `<strong>Fresh input:</strong> ${uploadedFileName} was analyzed.`));
   }
 
   if (analysis) {
     const findings = Array.isArray(analysis.findings) ? analysis.findings : [];
+    const topFinding = findings[0] || null;
     const criticalCount = findings.filter((item) => String(item.severity).toLowerCase() === "critical").length;
     const highCount = findings.filter((item) => String(item.severity).toLowerCase() === "high").length;
-    const topFinding = findings[0] || null;
-    const wow = analysis.features?.week_over_week_revenue_change_pct;
-    const repeatRate = analysis.features?.repeat_rate;
-    const refundRate = analysis.features?.refund_rate;
 
-    const pillRow = el("div", "decision-pill-row");
-    pillRow.appendChild(decisionPill("Run", analysis.run_id ? `#${analysis.run_id}` : "Latest", "neutral"));
-    pillRow.appendChild(decisionPill("Created", formatShortDate(analysis.created_at), "neutral"));
-    pillRow.appendChild(decisionPill("Source", analysis.source_file || "Unknown", "neutral"));
-    wrapper.appendChild(pillRow);
+    const meta = el("div", "decision-pill-row");
+    meta.appendChild(decisionPill("Run", analysis.run_id ? `#${analysis.run_id}` : "Latest"));
+    meta.appendChild(decisionPill("Created", formatShortDate(analysis.created_at)));
+    meta.appendChild(decisionPill("Source", analysis.source_file || "Unknown"));
+    wrapper.appendChild(meta);
 
-    const signalGrid = el("div", "run-signal-grid");
-    signalGrid.appendChild(
-      decisionPill(
-        "Findings",
-        findings.length ? `${findings.length} active` : "Clear",
-        findings.length ? "bad" : "good"
-      )
-    );
-    signalGrid.appendChild(
-      decisionPill("Critical / High", `${criticalCount} / ${highCount}`, criticalCount || highCount ? "bad" : "neutral")
-    );
-    signalGrid.appendChild(
-      decisionPill(
-        "WoW",
-        wow === null || wow === undefined ? "N/A" : formatTrend(wow),
-        wow !== null && wow !== undefined && Number(wow) < -10 ? "bad" : "neutral"
-      )
-    );
-    signalGrid.appendChild(
-      decisionPill("Repeat", repeatRate === null || repeatRate === undefined ? "N/A" : formatPct(repeatRate), "neutral")
-    );
-    signalGrid.appendChild(
-      decisionPill("Refund", refundRate === null || refundRate === undefined ? "N/A" : formatPct(refundRate), "neutral")
-    );
-    signalGrid.appendChild(decisionPill("Segment", analysis.segment || "Shopify", "neutral"));
-    wrapper.appendChild(signalGrid);
+    const outcome = el("div", "run-signal-grid");
+    outcome.appendChild(decisionPill("Findings", findings.length ? `${findings.length} active` : "Clear", findings.length ? "bad" : "good"));
+    outcome.appendChild(decisionPill("Critical / High", `${criticalCount} / ${highCount}`, criticalCount || highCount ? "bad" : "neutral"));
+    outcome.appendChild(decisionPill("Top leak", topFinding ? String(topFinding.title || "Leak detected") : "None", topFinding ? "bad" : "good"));
+    wrapper.appendChild(outcome);
 
-    const primary = el("section", "primary-decision-card");
-    primary.appendChild(textEl("span", "narrative-kicker", "Decision now"));
-    primary.appendChild(textEl("h3", "primary-decision-title", topFinding ? topFinding.title : "No urgent leak"));
-    primary.appendChild(
+    const nextMove = el("section", "primary-decision-card");
+    nextMove.appendChild(textEl("span", "narrative-kicker", "Next move"));
+    nextMove.appendChild(
       textEl(
         "p",
         "primary-decision-text",
         topFinding
-          ? (topFinding.what_to_do || topFinding.what_changed || analysis.summary || "")
-          : "No critical leak is active in this run. Keep the current plan and monitor the next cycle."
+          ? (topFinding.what_to_do || topFinding.what_changed || "Assign owner and execute this week.")
+          : "No urgent leak from this run. Keep monitoring on new data."
       )
     );
-    wrapper.appendChild(primary);
-
-    if (findings.length) {
-      const conciseGrid = el("div", "narrative-grid concise-findings");
-      findings.slice(0, 3).forEach((finding) => conciseGrid.appendChild(conciseFindingCard(finding)));
-      wrapper.appendChild(conciseGrid);
-    }
-  } else {
-    wrapper.appendChild(
-      narrativeCard(
-        "No run opened",
-        "Recent run history is available in the sidebar. Open one to see the full leak diagnosis.",
-        "neutral"
-      )
-    );
+    wrapper.appendChild(nextMove);
   }
 
   feed.appendChild(wrapper);
-
-  if (analysis) {
-    renderAnalysisCard(feed, analysis, { compact: true });
-  }
 }
 
-export function renderStoreWorkspace(feed, { performance, analysis, shopifyStatus } = {}) {
+export function renderStoreWorkspace(feed, { performance, analysis } = {}) {
   if (!feed) return;
   feed.innerHTML = "";
 
-  const summary = performance && performance.summary ? performance.summary : {};
-  const points = Array.isArray(performance && performance.points) ? performance.points : [];
+  const summary = performance?.summary || {};
+  const points = Array.isArray(performance?.points) ? performance.points : [];
   const fallbackPoint = analysis?.features
     ? {
-        timestamp: analysis?.created_at || new Date().toISOString(),
+        timestamp: analysis.created_at || new Date().toISOString(),
         total_revenue: Number(analysis.features.total_revenue || 0),
         repeat_rate: Number(analysis.features.repeat_rate || 0),
         refund_rate: Number(analysis.features.refund_rate || 0),
       }
     : null;
   const plotPoints = points.length ? points : (fallbackPoint ? [fallbackPoint] : []);
-  const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
 
   const wrapper = workspaceSection(
-    "Store operating view",
-    "This section keeps the entire store in view: momentum, retention, refund pressure, and current monitoring state."
+    "What changed?",
+    "Revenue momentum, retention, and refund movement for this window."
   );
 
-  const metricsGrid = el("div", "metrics-grid workspace-metrics");
-  metricsGrid.appendChild(metric("Revenue", formatCurrency(summary.total_revenue || 0)));
-  metricsGrid.appendChild(metric("Orders", Number(summary.order_count || 0).toLocaleString()));
-  metricsGrid.appendChild(metric("Customers", Number(summary.customer_count || 0).toLocaleString()));
-  metricsGrid.appendChild(metric("Revenue/User", formatCurrency(summary.revenue_per_user || 0)));
-  metricsGrid.appendChild(metric("Repeat Rate", formatPct(summary.repeat_rate || 0)));
-  metricsGrid.appendChild(
-    metric(
-      "WoW Revenue",
-      summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
-        ? "N/A"
-        : formatPct(summary.week_over_week_revenue_change_pct)
+  const top = el("div", "metrics-grid workspace-metrics");
+  top.appendChild(metric("WoW Revenue", summary.week_over_week_revenue_change_pct == null ? "N/A" : formatPct(summary.week_over_week_revenue_change_pct)));
+  top.appendChild(metric("Repeat Rate", formatPct(summary.repeat_rate || 0)));
+  top.appendChild(metric("Refund Rate", formatPct(summary.refund_rate || 0)));
+  wrapper.appendChild(top);
+
+  const trends = el("div", "narrative-grid");
+  trends.appendChild(
+    trendCard(
+      "Demand momentum",
+      summary.week_over_week_revenue_change_pct == null
+        ? "Trend unavailable yet."
+        : `WoW revenue is ${formatTrend(summary.week_over_week_revenue_change_pct)}.`,
+      plotPoints,
+      "total_revenue",
+      (value) => formatCurrency(value)
     )
   );
-  wrapper.appendChild(metricsGrid);
-
-  const narrativeGrid = el("div", "narrative-grid");
-  const demandTone = healthTone(summary.week_over_week_revenue_change_pct, { goodMin: 0, badMin: -10 });
-  const retentionTone = healthTone(summary.repeat_rate, { goodMin: 20, badMin: 10 });
-  const refundTone = healthTone(summary.refund_rate, { goodMin: 4, badMin: 8, reverse: true });
-
-  const demandCard = trendNarrativeCard(
-    "Demand momentum",
-    summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
-      ? "Revenue trend is not available yet because there is not enough recent run history."
-      : `Daily net revenue trend for the last ${performance?.window_days || 7} days. WoW is currently ${formatTrend(summary.week_over_week_revenue_change_pct)}.`,
-    plotPoints,
-    "total_revenue",
-    (value) => formatCurrency(value),
-    demandTone
-  );
-  narrativeGrid.appendChild(demandCard);
-
-  const retentionCard = trendNarrativeCard(
-    "Retention strength",
-    `Repeat rate trend across the last ${performance?.window_days || 7} days. Current repeat rate: ${formatPct(summary.repeat_rate || 0)}.`,
-    plotPoints,
-    "repeat_rate",
-    (value) => formatPct(value),
-    retentionTone
-  );
-  narrativeGrid.appendChild(retentionCard);
-
-  const refundCard = trendNarrativeCard(
-    "Refund pressure",
-    `Refund rate trend across the last ${performance?.window_days || 7} days. Current refund rate: ${formatPct(summary.refund_rate || 0)}.`,
-    plotPoints,
-    "refund_rate",
-    (value) => formatPct(value),
-    refundTone
-  );
-  narrativeGrid.appendChild(refundCard);
-  wrapper.appendChild(narrativeGrid);
-
-  const monitorGrid = el("div", "monitor-grid");
-  monitorGrid.appendChild(
-    el(
-      "article",
-      "monitor-card",
-      `<span class="label">Analysis coverage</span><strong>${points.length} run${points.length === 1 ? "" : "s"}</strong><p>Combined view across the last ${performance?.window_days || 7} days.</p>`
+  trends.appendChild(
+    trendCard(
+      "Retention strength",
+      `Repeat rate is ${formatPct(summary.repeat_rate || 0)}.`,
+      plotPoints,
+      "repeat_rate",
+      (value) => formatPct(value)
     )
   );
-  monitorGrid.appendChild(
-    el(
-      "article",
-      "monitor-card",
-      `<span class="label">Shopify connection</span><strong>${
-        shopifyStatus?.connected ? "Connected" : "Not connected"
-      }</strong><p>${
-        shopifyStatus?.connected
-          ? `${shopifyStatus.shop_domain || "Store"}${shopifyStatus.last_synced_at ? ` • last sync ${formatShortDate(shopifyStatus.last_synced_at)}` : ""}`
-          : "Connect Shopify to move from manual CSV uploads to continuous monitoring."
-      }</p>`
+  trends.appendChild(
+    trendCard(
+      "Refund pressure",
+      `Refund rate is ${formatPct(summary.refund_rate || 0)}.`,
+      plotPoints,
+      "refund_rate",
+      (value) => formatPct(value)
     )
   );
-  monitorGrid.appendChild(
-    el(
-      "article",
-      "monitor-card",
-      `<span class="label">Active leak pressure</span><strong>${findings.length}</strong><p>${
-        findings.length
-          ? "Current run has active leak detections. Review the action section for the next move."
-          : "No active critical leak in the current run."
-      }</p>`
+  wrapper.appendChild(trends);
+
+  const brief = el("section", "primary-decision-card");
+  brief.appendChild(textEl("span", "narrative-kicker", "Interpretation"));
+  brief.appendChild(
+    textEl(
+      "p",
+      "primary-decision-text",
+      `WoW ${summary.week_over_week_revenue_change_pct == null ? "N/A" : formatTrend(summary.week_over_week_revenue_change_pct)}, repeat ${formatPct(summary.repeat_rate || 0)}, refund ${formatPct(summary.refund_rate || 0)}.`
     )
   );
-  wrapper.appendChild(monitorGrid);
-
-  if (analysis) {
-    appendTopFindingCards(wrapper, findings);
-  }
-
-  const productPerformance = analysis?.features ? renderProductPerformance(analysis.features) : null;
-  if (productPerformance) {
-    wrapper.appendChild(productPerformance);
-  }
+  wrapper.appendChild(brief);
 
   feed.appendChild(wrapper);
 }
@@ -641,61 +266,44 @@ export function renderActionWorkspace(feed, { performance, analysis } = {}) {
   feed.innerHTML = "";
 
   const wrapper = workspaceSection(
-    "Action center",
-    "This is where leak detection becomes operating decisions. Pick the next move, log it, and watch impact over time."
+    "What should I do now?",
+    "One active leak with a focused 7-day playbook."
   );
 
-  const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
-  const feedback = performance && performance.action_feedback ? performance.action_feedback : null;
+  const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
+  const feedback = performance?.action_feedback || null;
 
   if (findings.length) {
-    const prioritized = [...findings].sort((left, right) => severityRank(right.severity) - severityRank(left.severity));
-    const nextMoves = el("div", "action-list");
-    prioritized.slice(0, 3).forEach((finding, index) => {
-      nextMoves.appendChild(
-        el(
-          "article",
-          "action-card",
-          `
-            <div class="action-card-head">
-              <span class="action-priority">Priority ${index + 1}</span>
-              <span class="severity">${finding.severity}</span>
-            </div>
-            <h3>${finding.title}</h3>
-            <p class="action-change">${finding.what_changed || ""}</p>
-            <p class="action-step"><strong>Do next:</strong> ${finding.what_to_do || "Assign an owner and act this week."}</p>
-          `
-        )
-      );
-    });
-    wrapper.appendChild(nextMoves);
-  } else {
+    const activeLeak = [...findings].sort((a, b) => severityRank(b.severity) - severityRank(a.severity))[0];
     wrapper.appendChild(
-      narrativeCard(
-        "No urgent leak",
-        "No active leak has crossed the current thresholds. Use this section to log actions and keep a clean operating record.",
-        "good"
+      el(
+        "article",
+        "action-card",
+        `<div class="action-card-head"><span class="action-priority">Active leak</span><span class="severity">${activeLeak.severity}</span></div><h3>${activeLeak.title}</h3><p class="action-change">${activeLeak.what_changed || ""}</p>`
       )
     );
+
+    const playbook = el("div", "action-list");
+    playbook.appendChild(el("article", "action-card", `<h3>Step 1 (Today)</h3><p class="action-step">${activeLeak.what_to_do || "Assign owner and start remediation."}</p>`));
+    playbook.appendChild(el("article", "action-card", "<h3>Step 2 (48 hours)</h3><p class=\"action-step\">Check execution and clear blockers.</p>"));
+    playbook.appendChild(el("article", "action-card", "<h3>Step 3 (Day 7)</h3><p class=\"action-step\">Review metric movement and decide next action.</p>"));
+    wrapper.appendChild(playbook);
+  } else {
+    wrapper.appendChild(el("article", "narrative-card is-good", "<span class=\"narrative-kicker\">No urgent leak</span><p>No active leak crossed thresholds. Continue monitoring this week.</p>"));
   }
 
   const feedbackPanel = el("section", "feedback-panel action-workspace-panel");
-  feedbackPanel.appendChild(textEl("h3", "workspace-subheading", "Latest action feedback"));
+  feedbackPanel.appendChild(textEl("h3", "workspace-subheading", "Execution log"));
   if (feedback) {
     feedbackPanel.appendChild(
       el(
         "p",
         "feedback-inline-meta",
-        `<strong>Action:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Reported:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> <span class="impact-chip">${feedback.impact_label || "Pending"}</span>`
+        `<strong>Action:</strong> ${feedback.action_taken}<br><strong>Date:</strong> ${feedback.action_date}<br><strong>Status:</strong> ${feedback.self_reported_outcome}<br><strong>Impact:</strong> <span class="impact-chip">${feedback.impact_label || "Pending"}</span>`
       )
     );
-    if (feedback.impact_note) {
-      feedbackPanel.appendChild(el("p", "sidebar-note", feedback.impact_note));
-    }
   } else {
-    feedbackPanel.appendChild(
-      textEl("p", "sidebar-note", "No action feedback yet. Log the next action so the product can tie changes back to real decisions.")
-    );
+    feedbackPanel.appendChild(textEl("p", "sidebar-note", "No execution log yet. Save what was done to track impact."));
   }
 
   const form = el("form", "action-feedback-form workspace-action-form", actionFormMarkup("Save Action"));
@@ -708,42 +316,17 @@ export function renderActionWorkspace(feed, { performance, analysis } = {}) {
 
 export function renderSidebarPerformance(container, payload, analysis = null, shopifyStatus = null) {
   if (!container) return;
-
-  const summary = payload && payload.summary ? payload.summary : {};
-  const points = Array.isArray(payload && payload.points) ? payload.points.length : 0;
-  const findings = Array.isArray(analysis && analysis.findings) ? analysis.findings : [];
-
+  const summary = payload?.summary || {};
+  const points = Array.isArray(payload?.points) ? payload.points.length : 0;
+  const findings = Array.isArray(analysis?.findings) ? analysis.findings.length : 0;
   container.innerHTML = "";
   const list = el("dl", "sidebar-kv-list");
-  list.appendChild(el("div", "sidebar-kv-item", `<dt>Revenue</dt><dd>$${Number(summary.total_revenue || 0).toLocaleString()}</dd>`));
+  list.appendChild(el("div", "sidebar-kv-item", `<dt>WoW</dt><dd>${summary.week_over_week_revenue_change_pct == null ? "N/A" : formatPct(summary.week_over_week_revenue_change_pct)}</dd>`));
   list.appendChild(el("div", "sidebar-kv-item", `<dt>Repeat</dt><dd>${formatPct(summary.repeat_rate || 0)}</dd>`));
   list.appendChild(el("div", "sidebar-kv-item", `<dt>Refund</dt><dd>${formatPct(summary.refund_rate || 0)}</dd>`));
-  list.appendChild(
-    el(
-      "div",
-      "sidebar-kv-item",
-      `<dt>WoW</dt><dd>${summary.week_over_week_revenue_change_pct === null || summary.week_over_week_revenue_change_pct === undefined
-        ? "N/A"
-        : `${Number(summary.week_over_week_revenue_change_pct).toFixed(2)}%`}</dd>`
-    )
-  );
   container.appendChild(list);
-  container.appendChild(
-    el(
-      "p",
-      "sidebar-note",
-      `${points} run${points === 1 ? "" : "s"} in last ${payload && payload.window_days ? payload.window_days : 7} days. ${findings.length ? `${findings.length} active leak${findings.length === 1 ? "" : "s"} in current run.` : "No active leak in current run."}`
-    )
-  );
-  container.appendChild(
-    el(
-      "p",
-      "sidebar-note",
-      shopifyStatus?.connected
-        ? `Connected to ${shopifyStatus.shop_domain || "Shopify"}${shopifyStatus.last_synced_at ? ` • synced ${formatShortDate(shopifyStatus.last_synced_at)}` : ""}.`
-        : "Shopify not connected yet."
-    )
-  );
+  container.appendChild(el("p", "sidebar-note", `${points} run${points === 1 ? "" : "s"} in current window. ${findings} active leak${findings === 1 ? "" : "s"}.`));
+  container.appendChild(el("p", "sidebar-note", shopifyStatus?.connected ? `Connected: ${shopifyStatus.shop_domain || "Shopify"}.` : "Shopify not connected yet."));
 }
 
 export function renderSidebarActionFeedback(container, payload, analysis = null) {
@@ -752,9 +335,7 @@ export function renderSidebarActionFeedback(container, payload, analysis = null)
 }
 
 export function clearEmptyState(feed, empty) {
-  if (empty && feed.contains(empty)) {
-    feed.removeChild(empty);
-  }
+  if (empty && feed.contains(empty)) feed.removeChild(empty);
 }
 
 export function resetFeed(feed) {
@@ -765,12 +346,10 @@ export function resetFeed(feed) {
 export function renderHistoryList(historyListEl, rows, onClick, activeRunId = null) {
   if (!historyListEl) return;
   historyListEl.innerHTML = "";
-
   if (!Array.isArray(rows) || rows.length === 0) {
     historyListEl.innerHTML = '<li class="history-empty">No saved analyses yet.</li>';
     return;
   }
-
   rows.forEach((row) => {
     const item = document.createElement("li");
     const button = document.createElement("button");
