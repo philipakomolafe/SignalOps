@@ -147,12 +147,14 @@
       </header>
       <div class="settings-modal-layout">
         <nav class="settings-nav" aria-label="Settings sections">
-          <button class="settings-nav-item" id="settings-tab-general" data-settings-tab="general" type="button">General</button>
-          <button class="settings-nav-item active" id="settings-tab-integrations" data-settings-tab="integrations" type="button">Integrations</button>
+          <button class="settings-nav-item active" id="settings-tab-general" data-settings-tab="general" type="button">General</button>
+          <button class="settings-nav-item" id="settings-tab-integrations" data-settings-tab="integrations" type="button">Integrations</button>
           <button class="settings-nav-item" id="settings-tab-notifications" data-settings-tab="notifications" type="button">Notifications</button>
+          <button class="settings-nav-item" id="settings-tab-billing" data-settings-tab="billing" type="button">Billing/Plan</button>
+          <button class="settings-nav-item" id="settings-tab-security" data-settings-tab="security" type="button">Security</button>
         </nav>
         <section class="settings-panel">
-          <div id="settings-pane-general" class="settings-pane" hidden>
+          <div id="settings-pane-general" class="settings-pane">
             <div class="settings-stack">
               <h4>General</h4>
               <label class="settings-label">Screen mode</label>
@@ -164,12 +166,24 @@
                 </label>
                 <span class="theme-switch-text">Dark</span>
               </div>
-              <p class="settings-note">SignalOps keeps this workspace focused on operational decisions from your store data.</p>
-              <p class="settings-note">Use Integrations to connect Shopify and trigger weekly reports.</p>
+              <label class="settings-label" for="settings-timezone">Timezone</label>
+              <select id="settings-timezone" class="settings-input">
+                <option value="Africa/Lagos" selected>Africa/Lagos (UTC+1)</option>
+                <option value="UTC">UTC</option>
+                <option value="America/New_York">America/New_York</option>
+                <option value="Europe/London">Europe/London</option>
+              </select>
+              <label class="settings-label" for="settings-language">Language</label>
+              <select id="settings-language" class="settings-input">
+                <option value="en" selected>English</option>
+              </select>
+              <label class="settings-label" for="settings-profile-name">Profile name</label>
+              <input id="settings-profile-name" class="settings-input" type="text" placeholder="Your name" />
+              <p class="settings-note">General settings apply to your current workspace experience.</p>
             </div>
           </div>
 
-          <div id="settings-pane-integrations" class="settings-pane">
+          <div id="settings-pane-integrations" class="settings-pane" hidden>
             <section class="settings-stack" aria-label="Integration settings">
               <h4>Shopify setup</h4>
               <label class="settings-label" for="shop-domain-input">Shopify store</label>
@@ -180,19 +194,40 @@
               </div>
               <button id="shopify-sync-btn" type="button">Sync now</button>
               <p id="shopify-status" class="settings-note">No Shopify connection yet.</p>
-            </section>
-
-            <section class="settings-stack" aria-label="Report settings">
-              <h4>Weekly report</h4>
-              <p class="settings-note">Send the latest weekly SignalOps brief to your account email.</p>
-              <button id="weekly-report-btn" type="button">Send report</button>
+              <p class="settings-note">Required permissions: read_products, read_orders, read_all_orders.</p>
             </section>
           </div>
 
           <div id="settings-pane-notifications" class="settings-pane" hidden>
             <div class="settings-stack">
               <h4>Notifications</h4>
-              <p class="settings-note">Notification controls will be added as monitoring channels expand.</p>
+              <label class="settings-label" for="weekly-report-btn">Weekly email report</label>
+              <button id="weekly-report-btn" type="button">Send report now</button>
+              <label class="settings-label" for="settings-alert-threshold">Alert threshold sensitivity</label>
+              <select id="settings-alert-threshold" class="settings-input">
+                <option value="low">Low (fewer alerts)</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High (more alerts)</option>
+              </select>
+              <p id="notifications-status" class="settings-note">Notification actions and thresholds are workspace-specific.</p>
+            </div>
+          </div>
+
+          <div id="settings-pane-billing" class="settings-pane" hidden>
+            <div class="settings-stack">
+              <h4>Billing & Plan</h4>
+              <p class="settings-note">Current plan: <strong id="settings-current-plan">Free</strong></p>
+              <a id="settings-upgrade-link" class="settings-link-btn" href="/buy/?plan=starter">Upgrade plan</a>
+              <p class="settings-note">Invoices are available from your payment provider checkout history.</p>
+            </div>
+          </div>
+
+          <div id="settings-pane-security" class="settings-pane" hidden>
+            <div class="settings-stack">
+              <h4>Security</h4>
+              <button id="security-reset-password-btn" type="button">Reset password</button>
+              <button id="security-signout-btn" type="button">Sign out all sessions</button>
+              <p id="security-status" class="settings-note">Use these controls to keep your account secure.</p>
             </div>
           </div>
         </section>

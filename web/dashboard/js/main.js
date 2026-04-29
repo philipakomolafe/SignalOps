@@ -61,6 +61,13 @@ const settingsCloseBtn = document.getElementById("settings-close-btn");
 const settingsNavItems = Array.from(document.querySelectorAll(".settings-nav-item"));
 const themeToggleInput = document.getElementById("theme-toggle-input");
 const themeSwitchControl = document.getElementById("theme-switch-control");
+const notificationsStatusEl = document.getElementById("notifications-status");
+const securityStatusEl = document.getElementById("security-status");
+const settingsCurrentPlanEl = document.getElementById("settings-current-plan");
+const settingsUpgradeLinkEl = document.getElementById("settings-upgrade-link");
+const settingsProfileNameEl = document.getElementById("settings-profile-name");
+const securityResetPasswordBtn = document.getElementById("security-reset-password-btn");
+const securitySignoutBtn = document.getElementById("security-signout-btn");
 const workspaceHeadingEl = document.querySelector(".workspace-title h1");
 const workspaceSubtitleEl = document.querySelector(".workspace-title p");
 
@@ -162,6 +169,9 @@ function syncUpgradeLinkForPlan(planCode, isAdmin) {
   const safe = String(planCode || "free").toLowerCase();
   currentPlanCode = safe;
   const isPaid = safe === "starter" || safe === "pro" || isAdmin;
+  if (settingsCurrentPlanEl) {
+    settingsCurrentPlanEl.textContent = formatPlanLabel(planCode, isAdmin);
+  }
   planPillEl.textContent = isPaid ? (formatPlanLabel(planCode, isAdmin) + " Active") : "Unlock";
 
   if (isPaid) {
@@ -171,8 +181,12 @@ function syncUpgradeLinkForPlan(planCode, isAdmin) {
 
   const returnPath = "/dashboard/?billing=pending";
   const targetPlan = safe === "free" ? "starter" : safe;
-  upgradeLinkEl.href =
+  const nextHref =
     "/buy/?plan=" + encodeURIComponent(targetPlan) + "&return=" + encodeURIComponent(returnPath);
+  upgradeLinkEl.href = nextHref;
+  if (settingsUpgradeLinkEl) {
+    settingsUpgradeLinkEl.href = nextHref;
+  }
   hangerEl.hidden = false;
 }
 
@@ -219,6 +233,18 @@ function setShopifyStatus(message, isError = false) {
   if (!shopifyStatusEl) return;
   shopifyStatusEl.textContent = message;
   shopifyStatusEl.classList.toggle("error", isError);
+}
+
+function setNotificationStatus(message, isError = false) {
+  if (!notificationsStatusEl) return;
+  notificationsStatusEl.textContent = message;
+  notificationsStatusEl.classList.toggle("error", isError);
+}
+
+function setSecurityStatus(message, isError = false) {
+  if (!securityStatusEl) return;
+  securityStatusEl.textContent = message;
+  securityStatusEl.classList.toggle("error", isError);
 }
 
 function setShopifyButtonsDisabled(disabled) {
@@ -318,7 +344,7 @@ function renderWorkspaceSection() {
 function openSettingsModal() {
   if (!settingsModalEl) return;
   settingsModalEl.hidden = false;
-  switchSettingsTab("integrations");
+  switchSettingsTab("general");
 }
 
 function closeSettingsModal() {
@@ -327,13 +353,13 @@ function closeSettingsModal() {
 }
 
 function switchSettingsTab(tabName) {
-  const next = String(tabName || "integrations").toLowerCase();
+  const next = String(tabName || "general").toLowerCase();
   settingsNavItems.forEach((button) => {
     const tab = String(button.getAttribute("data-settings-tab") || "").toLowerCase();
     button.classList.toggle("active", tab === next);
   });
 
-  const paneIds = ["general", "integrations", "notifications"];
+  const paneIds = ["general", "integrations", "notifications", "billing", "security"];
   paneIds.forEach((name) => {
     const pane = document.getElementById(`settings-pane-${name}`);
     if (!pane) return;
@@ -664,10 +690,10 @@ if (shopifySyncBtn) {
 if (weeklyReportBtn) {
   weeklyReportBtn.addEventListener("click", async () => {
     setShopifyButtonsDisabled(true);
-    setShopifyStatus("Sending weekly report...");
+    setNotificationStatus("Sending weekly report...");
     try {
       const result = await sendWeeklyReportNow();
-      setShopifyStatus(`Weekly report sent to ${result.recipient}.`);
+      setNotificationStatus(`Weekly report sent to ${result.recipient}.`);
       setStatus(`Weekly report sent to ${result.recipient}.`);
     } catch (error) {
       if (error.message === "AUTH_REQUIRED") {
@@ -675,7 +701,7 @@ if (weeklyReportBtn) {
         redirectToLogin();
         return;
       }
-      setShopifyStatus(error.message || "Failed to send weekly report.", true);
+      setNotificationStatus(error.message || "Failed to send weekly report.", true);
     } finally {
       setShopifyButtonsDisabled(false);
     }
@@ -725,7 +751,7 @@ if (openSettingsBtn) {
 if (settingsNavItems.length) {
   settingsNavItems.forEach((button) => {
     button.addEventListener("click", () => {
-      const tab = button.getAttribute("data-settings-tab") || "integrations";
+      const tab = button.getAttribute("data-settings-tab") || "general";
       switchSettingsTab(tab);
     });
   });
@@ -738,6 +764,25 @@ if (settingsCloseBtn) {
 if (themeToggleInput) {
   themeToggleInput.addEventListener("input", () => {
     applyTheme(themeToggleInput.checked ? "dark" : "light");
+  });
+}
+
+if (securityResetPasswordBtn) {
+  securityResetPasswordBtn.addEventListener("click", () => {
+    setSecurityStatus("Password reset flow is available from the login page.");
+    setStatus("Use the login page to reset your password.");
+  });
+}
+
+if (securitySignoutBtn) {
+  securitySignoutBtn.addEventListener("click", async () => {
+    setSecurityStatus("Signing out...");
+    try {
+      await logout();
+    } finally {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      redirectToLogin();
+    }
   });
 }
 
@@ -769,6 +814,7 @@ async function bootstrap() {
       const displayName = me.full_name || fallbackName;
       userNameEl.textContent = displayName;
       if (userPopoverNameEl) userPopoverNameEl.textContent = displayName;
+      if (settingsProfileNameEl) settingsProfileNameEl.value = displayName;
     }
 
     updateWorkspaceHeader("history");

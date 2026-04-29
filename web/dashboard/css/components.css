@@ -490,7 +490,10 @@
 #shopify-connect-btn,
 #shopify-disconnect-btn,
 #shopify-sync-btn,
-#weekly-report-btn {
+#weekly-report-btn,
+#security-reset-password-btn,
+#security-signout-btn,
+.settings-link-btn {
   width: 100%;
   border: 1px solid #cfd8e3;
   background: #fff;
@@ -500,12 +503,18 @@
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
 }
 
 #shopify-connect-btn:hover,
 #shopify-disconnect-btn:hover,
 #shopify-sync-btn:hover,
-#weekly-report-btn:hover {
+#weekly-report-btn:hover,
+#security-reset-password-btn:hover,
+#security-signout-btn:hover,
+.settings-link-btn:hover {
   background: #f2f6fb;
 }
 
@@ -517,6 +526,11 @@
 #weekly-report-btn {
   background: #fff8ee;
   border-color: #ead9bb;
+}
+
+#security-signout-btn {
+  background: #fff7f7;
+  border-color: #efcaca;
 }
 
 .settings-note {
@@ -579,6 +593,7 @@
   display: grid;
   align-content: start;
   gap: 4px;
+  overflow-y: auto;
 }
 
 .settings-nav-item {
@@ -1549,7 +1564,10 @@
 :root[data-theme="dark"] .workspace-action-form input,
 :root[data-theme="dark"] .workspace-action-form select,
 :root[data-theme="dark"] .settings-close-btn,
-:root[data-theme="dark"] .theme-switch-slider {
+:root[data-theme="dark"] .theme-switch-slider,
+:root[data-theme="dark"] #security-reset-password-btn,
+:root[data-theme="dark"] #security-signout-btn,
+:root[data-theme="dark"] .settings-link-btn {
   background: #111827;
   border-color: #334155;
   color: #e5e7eb;
@@ -1562,7 +1580,10 @@
 :root[data-theme="dark"] #shopify-connect-btn:hover,
 :root[data-theme="dark"] #shopify-disconnect-btn:hover,
 :root[data-theme="dark"] #shopify-sync-btn:hover,
-:root[data-theme="dark"] #weekly-report-btn:hover {
+:root[data-theme="dark"] #weekly-report-btn:hover,
+:root[data-theme="dark"] #security-reset-password-btn:hover,
+:root[data-theme="dark"] #security-signout-btn:hover,
+:root[data-theme="dark"] .settings-link-btn:hover {
   background: #1b2432;
 }
 
@@ -1805,7 +1826,11 @@
 
   #shopify-connect-btn,
   #shopify-disconnect-btn,
-  #shopify-sync-btn {
+  #shopify-sync-btn,
+  #weekly-report-btn,
+  #security-reset-password-btn,
+  #security-signout-btn,
+  .settings-link-btn {
     font-size: 0.64rem;
     padding: 0.32rem 0.28rem;
   }
